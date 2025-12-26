@@ -655,35 +655,32 @@ export default function App() {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) return;
-    setLoading(true);
-    try {
-      const collectionRef = collection(
-        db,
-        'artifacts',
-        appId,
-        'public',
-        'data',
-        'consultas_medicas'
-      );
-      await addDoc(collectionRef, {
-        ...formData,
-        userId: user.uid,
-        createdAt: serverTimestamp(),
-        active: formData.status !== 'Alta',
-        evolutions: [],
-      });
-      showNotification('Atendimento salvo!');
-      setFormData(initialFormState);
-      setView('list');
-    } catch (error) {
-      console.error(error);
-      showNotification('Erro ao salvar', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
+  e.preventDefault();
+  if (!user) return; // Segurança: só salva se houver usuário logado
+
+  setLoading(true);
+  try {
+    const collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'consultas_medicas');
+    
+    await addDoc(collectionRef, {
+      ...formData,
+      userId: user.uid, // <--- ADICIONE ESTA LINHA AQUI
+      userEmail: user.email, // Opcional: ajuda você a identificar no banco
+      createdAt: serverTimestamp(),
+      active: formData.status !== 'Alta',
+      evolutions: [],
+    });
+
+    setFormData(initialFormData);
+    setIsAddingPatient(false);
+    showNotification('Paciente cadastrado com sucesso!');
+  } catch (error) {
+    console.error('Erro ao salvar:', error);
+    showNotification('Erro ao salvar paciente', 'error');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const getGroupedPatients = () => {
     const filtered = patients.filter(
@@ -749,59 +746,54 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800 pb-20 w-full">
-      <header className="bg-white shadow-sm sticky top-0 z-10 border-b border-slate-200 w-full">
-        <div className="w-full max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
-          <div
-            className="flex items-center gap-2 cursor-pointer"
-            onClick={() => setView('list')}
-          >
-            <div className="bg-blue-600 text-white p-2 rounded-lg">
-              <Stethoscope size={20} />
+      <header className="bg-white dark:bg-slate-800 shadow-sm border-b border-slate-200 dark:border-slate-700 sticky top-0 z-30">
+  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+    {/* Lado Esquerdo: Logo e Título */}
+    <div className="flex items-center gap-2">
+      <Stethoscope className="w-8 h-8 text-blue-600" />
+      <h1 className="text-xl font-bold text-slate-900 dark:text-white">Plantão Zero</h1>
+    </div>
+
+    {/* Lado Direito: Info do Usuário e Botões */}
+    <div className="flex items-center gap-4">
+      
+      {/* IDENTIFICAÇÃO DO USUÁRIO (O que você pediu) */}
+      {user && (
+        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-700 rounded-full border border-slate-200 dark:border-slate-600">
+          {user.photoURL ? (
+            <img src={user.photoURL} alt="User" className="w-6 h-6 rounded-full" />
+          ) : (
+            <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-[10px] text-white">
+              {user.displayName?.charAt(0) || user.email?.charAt(0)}
             </div>
-            <div>
-              <h1 className="font-bold text-lg leading-none text-slate-800 hidden sm:block">
-                MedFlow
-              </h1>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 sm:gap-4">
-            <button
-              onClick={() => setShowInstallModal(true)}
-              className="bg-indigo-50 text-indigo-600 p-2 rounded-full hover:bg-indigo-100 transition-colors"
-              title="Instalar App"
-            >
-              <Smartphone size={20} />
-            </button>
-            <div className="h-6 w-px bg-slate-200 mx-1"></div>
-            {view !== 'list' && (
-              <button
-                onClick={goBackToList}
-                className="px-3 py-1.5 rounded-md flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-all"
-              >
-                <ArrowLeft size={16} />
-                <span className="hidden sm:inline">Voltar</span>
-              </button>
-            )}
-            {view === 'list' && (
-              <button
-                onClick={() => setView('form')}
-                className="px-3 py-1.5 rounded-md flex items-center gap-2 text-sm font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition-all"
-              >
-                <PlusCircle size={16} />
-                <span className="hidden sm:inline">Novo Paciente</span>
-              </button>
-            )}
-            <div className="h-6 w-px bg-slate-200 mx-1 hidden sm:block"></div>
-            <button
-              onClick={handleLogout}
-              className="text-slate-400 hover:text-red-500 transition-colors p-2 rounded-full hover:bg-red-50"
-              title="Sair"
-            >
-              <LogOut size={20} />
-            </button>
-          </div>
+          )}
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+            {user.displayName?.split(' ')[0] || 'Usuário'}
+          </span>
         </div>
-      </header>
+      )}
+
+      {/* BOTÕES DE AÇÃO */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setDarkMode(!darkMode)}
+          className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+          title="Alternar tema"
+        >
+          {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+        </button>
+        
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-2 px-3 py-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+        >
+          <LogOut className="w-5 h-5" />
+          <span className="hidden sm:inline font-medium">Sair</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
 
       {notification && (
         <div
