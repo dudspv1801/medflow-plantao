@@ -1,10 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import type { AuditLogInput } from '../../types/audit';
+import type { AuditLogInput, AuditLog } from '../../types/audit';
 import { canonicalizeForHash, sha256HexNode, signWithPrivateKey } from '../../server/crypto';
-import { PrismaClient } from '@prisma/client';
 import admin from 'firebase-admin';
-
-const prisma = new PrismaClient();
 
 /**
  * Initialize Firebase Admin once (server only)
@@ -85,12 +82,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Optionally compute prevHash for the resource (chains per resource)
   let prevHash: string | null = null;
   try {
-    const last = await prisma.auditLog.findFirst({
-      where: { resourceId: payload.resourceId },
-      orderBy: { createdAt: 'desc' },
-      select: { hash: true },
-    });
-    prevHash = last?.hash ?? null;
+    initFirebaseAdmin();
+    const db = admin.firestore();
+    const lastSnapshot = await db
+      .collection('audit_logs')
+      .where('resourceId', '==', payload.resourceId)
+      .orderBy('timestamp', 'desc')
+      .limit(1)
+      .get();
+    
+    if (!lastSnapshot.empty) {
+      const lastDoc = lastSnapshot.docs[0];
+      prevHash = lastDoc.data().hash ?? null;
+    }
   } catch (err) {
     console.error('Error fetching prevHash', err);
     // continue — not fatal
@@ -124,24 +128,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: 'Signing failed' });
   }
 
-  // Store in DB via Prisma (assumes AuditLog model exists in prisma/schema.prisma)
+  // Store in Firestore
   try {
-    const created = await prisma.auditLog.create({
-      data: {
-        userId,
-        actionType: payload.actionType,
-        resourceType: payload.resourceType,
-        resourceId: payload.resourceId,
-        changes: payload.changes as any,
-        metadata: serverPayload.metadata as any,
-        timestamp: new Date(timestamp),
-        hash,
-        prevHash,
-        signature,
-        keyId,
-      },
-    });
-    return res.status(201).json({ ok: true, id: created.id });
+    initFirebaseAdmin();
+    const db = admin.firestore();
+    
+    const auditLogData: Omit<AuditLog, 'id'> = {
+      userId,
+      actionType: payload.actionType,
+      resourceType: payload.resourceType,
+      resourceId: payload.resourceId,
+      changes: payload.changes,
+      metadata: serverPayload.metadata,
+      timestamp,
+      hash,
+      prevHash: prevHash || undefined,
+      signature,
+      keyId,
+    };
+
+    const docRef = await db.collection('audit_logs').add(auditLogData);
+    return res.status(201).json({ ok: true, id: docRef.id });
   } catch (err) {
     console.error('Failed to store audit log', err);
     return res.status(500).json({ error: 'Storage failed' });
