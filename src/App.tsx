@@ -530,12 +530,6 @@ export default function App() {
     setView('details');
   };
 
-  const goBackToList = () => {
-    setSelectedPatient(null);
-    setEvolutionText('');
-    setView('list');
-  };
-
   const openStatusModal = () => {
     if (selectedPatient) {
       setStatusUpdateValue(selectedPatient.status);
@@ -790,14 +784,18 @@ export default function App() {
       <div className="h-6 w-px bg-slate-200 mx-1"></div>
 
       {view !== 'list' && (
-        <button
-          onClick={() => setView('list')}
-          className="px-3 py-1.5 rounded-md flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-all"
-        >
-          <ArrowLeft size={16} />
-          <span className="hidden sm:inline">Voltar</span>
-        </button>
-      )}
+  <button
+    onClick={() => {
+      setSelectedPatient(null);
+      setEvolutionText('');
+      setView('list');
+    }}
+    className="px-3 py-1.5 rounded-md flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-all"
+  >
+    <ArrowLeft size={16} />
+    <span className="hidden sm:inline">Voltar</span>
+  </button>
+)}
 
       <button
         onClick={handleLogout}
