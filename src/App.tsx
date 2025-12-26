@@ -347,16 +347,49 @@ const InstallModal: React.FC<{ onClose: () => void }> = ({ onClose }) => (
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [darkMode, setDarkMode] = useState(false);
 
-  // Efeito para aplicar/remover a classe 'dark' no HTML
-  useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
+  // THEME: improved dark mode (persistent + respects system preference)
+  const getInitialTheme = (): 'light' | 'dark' => {
+    try {
+      const saved = localStorage.getItem('theme');
+      if (saved === 'dark' || saved === 'light') return saved;
+      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        return 'dark';
+      }
+    } catch (e) {
+      // ignore
     }
-  }, [darkMode]);
+    return 'light';
+  };
+
+  const [theme, setTheme] = useState<'light' | 'dark'>(() =>
+    typeof window === 'undefined' ? 'light' : getInitialTheme()
+  );
+
+  useEffect(() => {
+    // Apply/remove the `dark` class (tailwind dark variant depends on this)
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+
+    // Persist preference
+    try {
+      localStorage.setItem('theme', theme);
+    } catch (e) {
+      // ignore
+    }
+
+    // Update theme-color meta for mobile address bar
+    let metaThemeColor = document.querySelector('meta[name=theme-color]');
+    if (!metaThemeColor) {
+      metaThemeColor = document.createElement('meta');
+      metaThemeColor.setAttribute('name', 'theme-color');
+      document.head.appendChild(metaThemeColor);
+    }
+    metaThemeColor.setAttribute('content', theme === 'dark' ? '#0f172a' : '#2563eb');
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
+  };
 
   const [view, setView] = useState<'list' | 'form' | 'details'>('list');
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
@@ -389,14 +422,6 @@ export default function App() {
 
   useEffect(() => {
     document.title = 'MedFlow - Plantão';
-    let metaThemeColor = document.querySelector('meta[name=theme-color]');
-    if (!metaThemeColor) {
-      metaThemeColor = document.createElement('meta');
-      metaThemeColor.setAttribute('name', 'theme-color');
-      document.head.appendChild(metaThemeColor);
-    }
-    metaThemeColor.setAttribute('content', '#2563eb');
-
     let linkApple = document.querySelector(
       "link[rel='apple-touch-icon']"
     ) as HTMLLinkElement | null;
@@ -883,13 +908,13 @@ export default function App() {
             </div>
 
             <div className="flex items-center gap-2 sm:gap-4 px-6">
-              {/* Botão Dark Mode */}
+              {/* Botão Theme (novo) */}
               <button
-                onClick={() => setDarkMode(!darkMode)}
+                onClick={toggleTheme}
                 className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-slate-600 dark:text-yellow-400"
-                title={darkMode ? 'Ativar Modo Claro' : 'Ativar Modo Escuro'}
+                title={theme === 'dark' ? 'Ativar Modo Claro' : 'Ativar Modo Escuro'}
               >
-                {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+                {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
               </button>
 
               <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
