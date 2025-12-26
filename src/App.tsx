@@ -1190,71 +1190,81 @@ export default function App() {
           </div>
         )}
 
-        {view === 'list' && (
-          <div className="animate-in fade-in duration-300">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-              <div>
-                <h2 className="text-2xl font-bold text-slate-800">Lista de Pacientes</h2>
-                <p className="text-slate-500 text-sm">Organizado por turno e admissão</p>
-              </div>
+       {view === 'list' && (
+  <div className="animate-in fade-in duration-300">
+    <div className="flex flex-col gap-6 mb-8">
+      {/* Título e Botões de Ação */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold dark:text-white text-slate-800">Meus Pacientes</h2>
+          <p className="text-slate-500 text-sm">Gerencie seus atendimentos</p>
+        </div>
 
-              <div className="flex gap-2 items-center">
-                <button
-                  onClick={() => setShowDischarged(!showDischarged)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all border ${
-                    showDischarged
-                      ? 'bg-slate-200 text-slate-700 border-slate-300'
-                      : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  <Filter size={16} />
-                  {showDischarged ? 'Ocultar Altas' : 'Mostrar Altas'}
-                </button>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          {/* BOTÃO NOVO PACIENTE - Sempre Visível */}
+          <button
+            onClick={() => setView('form')}
+            className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg flex items-center justify-center gap-2 font-bold transition-all shadow-md"
+          >
+            <PlusCircle size={20} />
+            Novo Paciente
+          </button>
 
-                <div className="h-8 w-px bg-slate-200 mx-1 hidden sm:block"></div>
+          {/* Botão de Filtro de Altas */}
+          <button
+            onClick={() => setShowDischarged(!showDischarged)}
+            className={`p-2.5 rounded-lg border transition-all ${
+              showDischarged
+                ? 'bg-slate-200 text-slate-700 border-slate-300'
+                : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'
+            }`}
+            title={showDischarged ? "Ocultar Altas" : "Mostrar Altas"}
+          >
+            <Filter size={20} />
+          </button>
+        </div>
+      </div>
 
-                <div className="flex gap-2 text-sm bg-white p-1.5 rounded-lg border border-slate-200 shadow-sm">
-                  <div className="px-3 py-1 bg-green-50 text-green-700 rounded-md">
-                    <span className="font-bold">
-                      {patients.filter((p) => p.status === 'Alta').length}
-                    </span>{' '}
-                    Alta
-                  </div>
-                  <div className="px-3 py-1 bg-yellow-50 text-yellow-700 rounded-md">
-                    <span className="font-bold">
-                      {patients.filter((p) => p.status === 'Observação').length}
-                    </span>{' '}
-                    Obs
-                  </div>
-                  <div className="px-3 py-1 bg-orange-50 text-orange-700 rounded-md">
-                    <span className="font-bold">
-                      {patients.filter((p) => p.status === 'Aguardando Vaga').length}
-                    </span>{' '}
-                    Vaga
-                  </div>
-                </div>
-              </div>
-            </div>
+      {/* BARRA DE PESQUISA */}
+      <div className="relative w-full">
+        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          {/* Usei o ícone de busca aqui para ficar mais intuitivo */}
+          <Activity size={18} className="text-slate-400" /> 
+        </div>
+        <input
+          type="text"
+          placeholder="Pesquisar por nome do paciente..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full pl-10 pr-10 py-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm"
+        />
+        {searchTerm && (
+          <button 
+            onClick={() => setSearchTerm('')}
+            className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+          >
+            <X size={16} />
+          </button>
+        )}
+      </div>
+    </div>
 
-            <div className="relative w-full mb-6">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Filter size={18} className="text-slate-400" />
-              </div>
-              <input
-                type="text"
-                placeholder="Pesquisar paciente pelo nome..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="block w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-              />
-              {searchTerm && (
-                <button
-                  onClick={() => setSearchTerm('')}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
-                >
-                  <X size={16} />
-                </button>
-              )}
+    {/* LISTAGEM - Onde o resultado da busca aparece */}
+    {getFilteredAndGroupedPatients().length === 0 ? (
+      <div className="text-center py-20 bg-white dark:bg-slate-800 rounded-xl border border-dashed border-slate-300 dark:border-slate-700">
+        <p className="text-slate-400">Nenhum paciente encontrado.</p>
+        {searchTerm && (
+          <button
+            onClick={() => setSearchTerm('')}
+            className="text-blue-500 font-medium mt-2 hover:underline"
+          >
+            Limpar pesquisa
+          </button>
+        )}
+      </div>
+    ) : (
+      <div className="space-y-8">
+        {/* Aqui continua o seu .map anterior que exibe os grupos de plantão */}
             </div>
 
             {patients.length === 0 ? (
