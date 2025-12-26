@@ -541,47 +541,36 @@ export default function App() {
   };
 
   const handleUpdateStatus = async () => {
-    if (
-      !selectedPatient ||
-      !statusUpdateValue ||
-      !statusJustification.trim() ||
-      !user
-    )
-      return;
-    setLoading(true);
-    try {
-      const patientRef = doc(
-        db,
-        'artifacts',
-        appId,
-        'public',
-        'data',
-        'consultas_medicas',
-        selectedPatient.id
-      );
-      const oldStatus = selectedPatient.status;
+  if (!selectedPatient || !statusUpdateValue || !statusJustification.trim() || !user) return;
+  setLoading(true);
+  try {
+    const patientRef = doc(db, 'artifacts', appId, 'public', 'data', 'consultas_medicas', selectedPatient.id);
+    const oldStatus = selectedPatient.status;
 
-      const newEvolution: Evolution = {
-        text: `🔄 STATUS ALTERADO\nDe: ${oldStatus}\nPara: ${statusUpdateValue}\nMotivo: ${statusJustification}`,
-        createdAt: new Date().toISOString(),
-        createdBy: user.uid,
-      };
+    const newEvolution: Evolution = {
+      text: `🔄 STATUS ALTERADO\nDe: ${oldStatus}\nPara: ${statusUpdateValue}\nMotivo: ${statusJustification}`,
+      createdAt: new Date().toISOString(),
+      createdBy: user.uid,
+    };
 
-      await updateDoc(patientRef, {
-        status: statusUpdateValue,
-        active: !['Alta', 'Internado', 'Transferido'].includes(statusUpdateValue),
-        evolutions: arrayUnion(newEvolution),
-      });
+    // ATUALIZAÇÃO: Define 'active: false' para Alta, Internado ou Transferido
+    const isFinalStatus = ['Alta', 'Internado', 'Transferido'].includes(statusUpdateValue);
 
-      showNotification('Status atualizado com sucesso!');
-      setIsStatusModalOpen(false);
-    } catch (error) {
-      console.error('Erro ao atualizar status:', error);
-      showNotification('Erro ao atualizar status', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
+    await updateDoc(patientRef, {
+      status: statusUpdateValue,
+      active: !isFinalStatus, // Se for um status final, active será false
+      evolutions: arrayUnion(newEvolution),
+    });
+
+    showNotification('Status atualizado com sucesso!');
+    setIsStatusModalOpen(false);
+  } catch (error) {
+    console.error('Erro ao atualizar status:', error);
+    showNotification('Erro ao atualizar status', 'error');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleAddEvolution = async () => {
     if (!evolutionText.trim() || !selectedPatient || !user) return;
@@ -1177,8 +1166,9 @@ export default function App() {
     </PDFDownloadLink>
   </Card>
 
-  {/* Condicional: Nova Evolução OU Mensagem de Alta */}
-  {selectedPatient.status !== 'Alta' ? (
+  {/* Condicional: Nova Evolução OU Mensagem de Atendimento Encerrado */}
+  {/* Atendimento é considerado "Ativo" se NÃO for Alta, Internado ou Transferido */}
+  {selectedPatient.status !== 'Alta' && selectedPatient.status !== 'Internado' && selectedPatient.status !== 'Transferido' ? (
     <Card className="p-4 sticky top-24 border-t-4 border-t-green-500">
       <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
         <PlusCircle size={18} className="text-green-600" /> Nova Evolução
@@ -1202,11 +1192,12 @@ export default function App() {
     <div className="bg-green-50 p-6 rounded-xl border border-green-200 text-green-800 text-center">
       <CheckCircle size={32} className="mx-auto mb-2 text-green-500 opacity-70" />
       <p className="font-bold">Atendimento Encerrado</p>
-      <p className="text-sm opacity-75">Paciente recebeu alta.</p>
+      <p className="text-sm opacity-75">
+        Status: {selectedPatient.status}. O prontuário foi finalizado.
+      </p>
     </div>
   )}
 
-  {/* Pendências */}
   {selectedPatient.pendencias && (
     <div className="mt-4 bg-orange-50 p-4 rounded-xl border border-orange-200">
       <h4 className="font-bold text-orange-800 text-sm mb-2 flex items-center gap-2">
