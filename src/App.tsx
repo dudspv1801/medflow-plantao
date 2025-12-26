@@ -1134,8 +1134,8 @@ export default function App() {
                   ))}
                 </div>
               </div>
-              <div className="lg:col-span-1">
-  {/* O bloco do PDF fica agora fora de qualquer condição para aparecer sempre */}
+          <div className="lg:col-span-1">
+  {/* Card do PDF - Sempre Visível */}
   <Card className="p-4 mb-4 bg-blue-50 border-t-4 border-t-blue-500">
     <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
       <FileText size={18} className="text-blue-600" /> Relatório Médico
@@ -1177,7 +1177,7 @@ export default function App() {
     </PDFDownloadLink>
   </Card>
 
-  {/* A condição abaixo agora serve apenas para mostrar a Evolução ou a mensagem de Alta */}
+  {/* Condicional: Nova Evolução OU Mensagem de Alta */}
   {selectedPatient.status !== 'Alta' ? (
     <Card className="p-4 sticky top-24 border-t-4 border-t-green-500">
       <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
@@ -1199,13 +1199,14 @@ export default function App() {
       </button>
     </Card>
   ) : (
-    <div className="bg-green-50 p-4 rounded-xl border border-green-200 text-green-800 text-center">
-      <CheckCircle size={32} className="mx-auto mb-2 opacity-50" />
-      <p className="font-medium">Paciente recebeu alta.</p>
-      <p className="text-sm opacity-75">Não é possível adicionar novas evoluções.</p>
+    <div className="bg-green-50 p-6 rounded-xl border border-green-200 text-green-800 text-center">
+      <CheckCircle size={32} className="mx-auto mb-2 text-green-500 opacity-70" />
+      <p className="font-bold">Atendimento Encerrado</p>
+      <p className="text-sm opacity-75">Paciente recebeu alta.</p>
     </div>
   )}
 
+  {/* Pendências */}
   {selectedPatient.pendencias && (
     <div className="mt-4 bg-orange-50 p-4 rounded-xl border border-orange-200">
       <h4 className="font-bold text-orange-800 text-sm mb-2 flex items-center gap-2">
