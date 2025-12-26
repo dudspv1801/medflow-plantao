@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
-// Removido o import externo para evitar erro de build no ambiente.
-// O layout será garantido via injeção direta de CSS no useEffect.
 import { 
   getAuth, 
   onAuthStateChanged, 
@@ -27,7 +25,7 @@ import {
   LogOut, Stethoscope, ArrowLeft, Send, History, 
   ChevronRight, Sun, Moon, Edit2, Trash2, Search, 
   Brain, Lock, FileDown, ShieldCheck, Smartphone, 
-  CheckCircle, BedDouble, Ambulance, Filter
+  CheckCircle, BedDouble, Ambulance, Filter, Clipboard
 } from 'lucide-react';
 
 // --- CONFIGURAÇÃO FIREBASE ---
@@ -45,7 +43,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = "plantao-zero-app";
-const apiKey = ""; // Chave Gemini API (vazia para uso do ambiente)
+const apiKey = ""; // Gemini API Key (providenciada pelo ambiente)
 
 // --- TIPAGENS ---
 interface VitalRecord {
@@ -138,15 +136,6 @@ const TextArea: React.FC<any> = ({ label, required, ...props }) => (
   </div>
 );
 
-const SelectComponent: React.FC<any> = ({ label, options, required, ...props }) => (
-  <div className="mb-4">
-    <Label required={required}>{label}</Label>
-    <select className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-slate-800 dark:text-slate-100 font-bold" {...props}>
-      {options.map((opt: any) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-    </select>
-  </div>
-);
-
 const Badge: React.FC<{ status: string }> = ({ status }) => {
   const styles: Record<string, string> = {
     'Alta': 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
@@ -174,7 +163,7 @@ const Badge: React.FC<{ status: string }> = ({ status }) => {
 
 // --- GRÁFICO TENDÊNCIAS ---
 const SparkLine = ({ data, color }: { data: number[], color: string }) => {
-  if (!data || data.length < 2) return <div className="text-[10px] opacity-40 italic">Processando histórico...</div>;
+  if (!data || data.length < 2) return <div className="text-[10px] opacity-40 italic">Iniciando dados...</div>;
   const min = Math.min(...data);
   const max = Math.max(...data);
   const range = (max - min) || 1;
@@ -220,7 +209,6 @@ export default function App() {
     if (isDarkMode) root.classList.add('dark'); else root.classList.remove('dark');
     localStorage.setItem('medflow-theme', isDarkMode ? 'dark' : 'light');
 
-    // Injeção de estilos para garantir o layout sem o ficheiro App.css externo
     const styleId = 'medflow-critical-styles';
     if (!document.getElementById(styleId)) {
       const style = document.createElement('style');
@@ -309,7 +297,7 @@ export default function App() {
     setLoading(true);
     try {
       const vital: VitalRecord = { pa: formData.pa, fc: formData.fc, sat: formData.sat, temp: formData.temp, timestamp: new Date().toISOString() };
-      const log: AuditEntry = { action: 'ADMISSÃO', timestamp: new Date().toISOString(), details: 'Paciente admitido na base privada.' };
+      const log: AuditEntry = { action: 'ADMISSÃO', timestamp: new Date().toISOString(), details: 'Registo inicial criado.' };
       await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'consultas_medicas'), {
         ...formData,
         userId: user.uid,
@@ -334,7 +322,8 @@ export default function App() {
     const result = await callGemini(`Sugira o código CID-10 para a hipótese: "${hip}". Retorne apenas o código e o nome.`);
     if (view === 'form') setFormData({...formData, hipotese: `${formData.hipotese} (Sugestão CID: ${result})`});
     else if (selectedPatient) {
-       await updateDoc(doc(db, 'artifacts', appId, 'users', user!.uid, 'consultas_medicas', selectedPatient.id), { hipotese: `${selectedPatient.hipotese} (Sugestão CID: ${result})` });
+       const pRef = doc(db, 'artifacts', appId, 'users', user!.uid, 'consultas_medicas', selectedPatient.id);
+       await updateDoc(pRef, { hipotese: `${selectedPatient.hipotese} (Sugestão CID: ${result})` });
     }
     setIsCidLoading(false);
   };
@@ -404,13 +393,13 @@ export default function App() {
           
           <div className="flex-1 max-w-xl relative">
             <Search className="absolute left-3 top-2.5 text-slate-400" size={18} />
-            <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Pesquisar paciente..." className="w-full pl-10 pr-4 py-2 bg-slate-100 dark:bg-slate-700 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none dark:text-white transition-all font-medium" />
+            <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Pesquisar..." className="w-full pl-10 pr-4 py-2 bg-slate-100 dark:bg-slate-700 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none dark:text-white transition-all font-medium" />
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
              <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-200 transition-all shadow-sm"><Sun size={20} className="hidden dark:block"/><Moon size={20} className="dark:hidden"/></button>
              <button className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 shadow-sm"><Smartphone size={20} /></button>
-             {view === 'list' && <button onClick={() => setView('form')} className="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 hover:bg-blue-700 shadow-lg active:scale-95 transition-all"><PlusCircle size={16} /> <span className="hidden sm:inline uppercase">ADMITIR</span></button>}
+             {view === 'list' && <button onClick={() => setView('form')} className="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 hover:bg-blue-700 shadow-lg active:scale-95 transition-all"><PlusCircle size={16} /> <span className="hidden sm:inline uppercase tracking-widest">ADMITIR</span></button>}
              {view !== 'list' && <button onClick={goBackToList} className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 transition-all shadow-sm"><ArrowLeft size={20} /></button>}
              <button onClick={() => signOut(auth)} className="p-2 text-slate-400 hover:text-red-500 transition-colors ml-1"><LogOut size={22} /></button>
           </div>
@@ -423,12 +412,12 @@ export default function App() {
 
       {/* MODAL STATUS */}
       {isStatusModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white dark:bg-slate-800 rounded-[2.5rem] w-full max-w-md shadow-2xl p-8 animate-in zoom-in-95 duration-200">
-            <h3 className="font-black text-xl mb-6 flex items-center gap-3 dark:text-white"><Edit2 className="text-blue-500" /> Status</h3>
+            <h3 className="font-black text-xl mb-6 flex items-center gap-3 dark:text-white"><Edit2 className="text-blue-500" /> Alterar Status</h3>
             <div className="space-y-6">
                <select className="w-full p-4 rounded-2xl border-2 border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 font-bold dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" value={statusUpdateValue} onChange={(e) => setStatusUpdateValue(e.target.value)}>
-                  <option value="Alta">Alta</option><option value="Observação">Observação</option><option value="Aguardando Vaga">Vaga</option><option value="Internado">Internado</option><option value="Transferido">Transferido</option>
+                  <option value="Alta">Alta</option><option value="Observação">Observação</option><option value="Aguardando Vaga">Vaga</option><option value="Internado">Internado</option>
                </select>
                <textarea className="w-full p-4 rounded-2xl border-2 border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 min-h-[100px] dark:text-white font-medium focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Motivo da alteração..." value={statusJustification} onChange={(e) => setStatusJustification(e.target.value)} />
                <div className="flex gap-4">
@@ -587,7 +576,7 @@ export default function App() {
                                     const text = `PACIENTE: ${selectedPatient.nome}\nVITAI: ${vitals}\nHD: ${selectedPatient.hipotese}\nCONDUTA: ${selectedPatient.conduta}\nSTATUS: ${selectedPatient.status}`;
                                     const el = document.createElement('textarea'); el.value = text; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el);
                                     showNotification("Prontuário copiado!");
-                                  }} title="Copiar prontuário rápido" className="p-5 rounded-3xl bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300 transition-all shadow-lg active:scale-90"><Filter size={28} /></button>
+                                  }} title="Copiar prontuário rápido" className="p-5 rounded-3xl bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300 transition-all shadow-lg active:scale-90"><Clipboard size={28} /></button>
                                   <button onClick={async () => {
                                     if(!evolutionText.trim()) return;
                                     setLoading(true);
