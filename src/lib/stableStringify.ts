@@ -4,7 +4,7 @@
 export function stableStringify(value: unknown): string {
   const visited = new WeakSet();
 
-  function replacer(key: string, val: any) {
+  function replacer(_key: string, val: any) {
     // Avoid cycles
     if (val && typeof val === 'object') {
       if (visited.has(val)) return '[Circular]';

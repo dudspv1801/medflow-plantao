@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { AuditLogInput } from '../../src/types/audit';
-import { canonicalizeForHash, sha256HexNode, signWithPrivateKey } from '../../src/server/crypto';
+import type { AuditLogInput } from '../../types/audit';
+import { canonicalizeForHash, sha256HexNode, signWithPrivateKey } from '../../server/crypto';
 import { PrismaClient } from '@prisma/client';
 import admin from 'firebase-admin';
 

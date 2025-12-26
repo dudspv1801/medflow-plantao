@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
+import { ServiceReportPDF } from './components/ServiceReportPDF';
+import { PDFDownloadLink } from '@react-pdf/renderer';
 import './App.css';
 import {
   getAuth,
@@ -409,6 +411,7 @@ export default function App() {
   };
 
   const [formData, setFormData] = useState(initialFormState);
+  const [auditHash, setAuditHash] = useState<string>(''); // Hash for PDF auditing
 
   useEffect(() => {
     const initAuth = async () => {
@@ -521,6 +524,9 @@ export default function App() {
   const openPatientDetails = (patient: Patient) => {
     setSelectedPatient(patient);
     setView('details');
+    // Generate a simple audit hash (patient id + timestamp)
+    const hash = `${patient.id}-${new Date().getTime()}`;
+    setAuditHash(hash);
   };
 
   const openStatusModal = () => {
@@ -1113,11 +1119,30 @@ export default function App() {
                     </button>
                   </Card>
                 ) : (
-                  <div className="bg-green-50 p-4 rounded-xl border border-green-200 text-green-800 text-center">
-                    <CheckCircle size={32} className="mx-auto mb-2 opacity-50" />
-                    <p className="font-medium">Paciente recebeu alta.</p>
-                    <p className="text-sm opacity-75">Não é possível adicionar evoluções.</p>
-                  </div>
+                  <>
+                    <Card className="p-4 mb-4 bg-blue-50 border-t-4 border-t-blue-500">
+                      <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
+                        <FileText size={18} className="text-blue-600" /> Relatório Médico
+                      </h3>
+                      <p className="text-xs text-slate-600 mb-4">Gere um relatório PDF do atendimento com assinatura digital.</p>
+                      <PDFDownloadLink
+                        document={<ServiceReportPDF atendimentoData={{ clinicName: 'MedFlow - Plantão Zero', professionalName: user?.displayName || 'Profissional', patientName: selectedPatient.nome, patientAge: selectedPatient.idade, patientId: selectedPatient.id, notes: `Queixa: ${selectedPatient.queixa}\n\nHDA: ${selectedPatient.hda}\n\nExame Físico: ${selectedPatient.exameFisico}\n\nHipótese: ${selectedPatient.hipotese}\n\nConduta: ${selectedPatient.conduta}`, date: selectedPatient.createdAt ? new Date(selectedPatient.createdAt.seconds * 1000).toISOString() : new Date().toISOString() }} auditHash={auditHash} />}
+                        fileName={`atendimento-${selectedPatient.nome.replace(/\s+/g, '_')}.pdf`}
+                      >
+                        {({ loading }) => (
+                          <button type="button" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed" disabled={loading}>
+                            <FileText size={16} />
+                            {loading ? 'Gerando PDF...' : 'Baixar PDF para Assinar'}
+                          </button>
+                        )}
+                      </PDFDownloadLink>
+                    </Card>
+                    <div className="bg-green-50 p-4 rounded-xl border border-green-200 text-green-800 text-center">
+                      <CheckCircle size={32} className="mx-auto mb-2 opacity-50" />
+                      <p className="font-medium">Paciente recebeu alta.</p>
+                      <p className="text-sm opacity-75">Não é possível adicionar evoluções.</p>
+                    </div>
+                  </>
                 )}
                 {selectedPatient.pendencias && (
                   <div className="mt-4 bg-orange-50 p-4 rounded-xl border border-orange-200">

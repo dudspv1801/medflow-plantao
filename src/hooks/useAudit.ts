@@ -2,7 +2,7 @@
 // The server will compute its own timestamp/hash/signature and store immutable logs.
 
 import { useCallback } from 'react';
-import { AuditLogInput } from '../types/audit';
+import type { AuditLogInput } from '../types/audit';
 import { stableStringify } from '../lib/stableStringify';
 import { sha256HexBrowser } from '../lib/crypto-browser';
 
