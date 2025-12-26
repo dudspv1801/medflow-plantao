@@ -722,7 +722,7 @@ export default function App() {
           <button
             onClick={handleGoogleLogin}
             disabled={authLoading}
-            className="w-full bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-slate-400 font-medium py-3 px-4 rounded-lg flex items-center justify-center gap-3 transitio[...]
+            className="w-full bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-slate-400 font-medium py-3 px-4 rounded-lg flex items-center justify-center gap-3 transition-colors"
           >
             {authLoading ? (
               <span className="w-5 h-5 border-2 border-slate-300 border-t-blue-600 rounded-full animate-spin" />
@@ -978,7 +978,7 @@ export default function App() {
                     <button
                       type="submit"
                       disabled={loading}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-medium flex items-center gap-2 shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-al[...]
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-medium flex items-center gap-2 shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {loading ? (
                         'Salvando...'
@@ -1107,7 +1107,7 @@ export default function App() {
                     <button
                       onClick={handleAddEvolution}
                       disabled={loading || !evolutionText.trim()}
-                      className="w-full bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:curs[...]
+                      className="w-full bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {loading ? 'Salvando...' : (<><Send size={16} /> Salvar Evolução</>)}
                     </button>
@@ -1178,7 +1178,7 @@ export default function App() {
           placeholder="Pesquisar por nome do paciente..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-10 pr-10 py-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transitio[...]
+          className="w-full pl-10 pr-10 py-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-colors"
         />
         {searchTerm && (
           <button 
