@@ -444,7 +444,8 @@ useEffect(() => {
       setUser(currentUser);
     });
     return (
-  <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-sans pb-20 w-full transition-colors duration-300">
+  <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-sans pb-20 w-full transition-colors duration-300">) </div>
+      
   }, []);
 
   const handleGoogleLogin = async () => {
