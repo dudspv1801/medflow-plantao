@@ -809,62 +809,168 @@ export default function App() {
       <div className="h-6 w-px bg-slate-200 mx-1"></div>
 
      {view === 'list' && (
-  <div className="animate-in fade-in duration-300">
-    <div className="flex flex-col gap-6 mb-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-800">Lista de Pacientes</h2>
-          <p className="text-slate-500 text-sm">Organizado por turno e admissão</p>
-        </div>
-        
-        {/* BOTÃO DE FILTRAR ALTA (Já existente, mantido aqui) */}
-        <button
-          onClick={() => setShowDischarged(!showDischarged)}
-          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all border ${
-            showDischarged
-              ? 'bg-slate-200 text-slate-700 border-slate-300'
-              : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
-          }`}
-        >
-          <Filter size={16} />
-          {showDischarged ? 'Ocultar Altas' : 'Mostrar Altas'}
-        </button>
-      </div>
+          <div className="animate-in fade-in duration-300">
+            <div className="flex flex-col gap-6 mb-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-800">
+                    Lista de Pacientes
+                  </h2>
+                  <p className="text-slate-500 text-sm">
+                    Organizado por turno e admissão
+                  </p>
+                </div>
 
-      {/* BARRA DE PESQUISA (Nova) */}
-      <div className="relative w-full">
-        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <Filter size={18} className="text-slate-400" /> {/* Ou use o ícone Search se tiver importado */}
-        </div>
-        <input
-          type="text"
-          placeholder="Pesquisar paciente pelo nome..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="block w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl leading-5 bg-white shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-all"
-        />
-        {searchTerm && (
-          <button 
-            onClick={() => setSearchTerm('')}
-            className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
-          >
-            <X size={16} />
-          </button>
+                <div className="flex gap-2 items-center">
+                  <button
+                    onClick={() => setShowDischarged(!showDischarged)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all border ${
+                      showDischarged
+                        ? 'bg-slate-200 text-slate-700 border-slate-300'
+                        : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <Filter size={16} />
+                    {showDischarged ? 'Ocultar Altas' : 'Mostrar Altas'}
+                  </button>
+                </div>
+              </div>
+
+              {/* BARRA DE PESQUISA */}
+              <div className="relative w-full">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Filter size={18} className="text-slate-400" />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Pesquisar paciente pelo nome..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="block w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                />
+                {searchTerm && (
+                  <button 
+                    onClick={() => setSearchTerm('')}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {patients.length === 0 ? (
+              <div className="text-center py-20 bg-white rounded-xl border border-dashed border-slate-300">
+                <p className="text-slate-400">
+                  Nenhum atendimento registrado ainda.
+                </p>
+                <button
+                  onClick={() => setView('form')}
+                  className="text-blue-500 font-medium mt-2 hover:underline"
+                >
+                  Começar atendimento
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-8">
+                {getFilteredAndGroupedPatients().map(
+                  ([shiftLabel, { info, patients: groupPatients }]) => (
+                    <div
+                      key={shiftLabel}
+                      className="animate-in fade-in slide-in-from-bottom-2 duration-500"
+                    >
+                      <div
+                        className={`flex items-center gap-2 mb-3 px-1 border-l-4 pl-3 ${
+                          info.isNight
+                            ? 'border-indigo-500'
+                            : 'border-orange-500'
+                        }`}
+                      >
+                        <div
+                          className={`p-1.5 rounded-md ${
+                            info.isNight
+                              ? 'bg-indigo-100 text-indigo-600'
+                              : 'bg-orange-100 text-orange-600'
+                          }`}
+                        >
+                          {info.icon}
+                        </div>
+                        <h3 className="font-bold text-slate-700 text-lg">
+                          {shiftLabel}
+                        </h3>
+                        <span className="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-medium">
+                          {groupPatients.length}
+                        </span>
+                      </div>
+
+                      {/* TABELA (DESKTOP) */}
+                      <div className="hidden md:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-6">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                              <th className="p-4 font-semibold text-slate-600">Paciente</th>
+                              <th className="p-4 font-semibold text-slate-600">Hipótese / Conduta</th>
+                              <th className="p-4 font-semibold text-slate-600">Status</th>
+                              <th className="p-4 font-semibold text-slate-600">Admissão</th>
+                              <th className="p-4 font-semibold text-slate-600 text-right">Ações</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {groupPatients.map((patient) => (
+                              <tr
+                                key={patient.id}
+                                onClick={() => openPatientDetails(patient)}
+                                className="hover:bg-blue-50 cursor-pointer transition-colors group"
+                              >
+                                <td className="p-4 align-top">
+                                  <div className="font-bold text-slate-800">{patient.nome}</div>
+                                  <div className="text-sm text-slate-500">{patient.idade} anos</div>
+                                </td>
+                                <td className="p-4 align-top max-w-xs">
+                                  <div className="font-medium text-slate-700 mb-1">{patient.hipotese}</div>
+                                  <div className="text-xs text-slate-500 line-clamp-1">{patient.conduta}</div>
+                                </td>
+                                <td className="p-4 align-top">
+                                  <Badge status={patient.status} />
+                                </td>
+                                <td className="p-4 align-top text-sm text-slate-500">
+                                  {patient.createdAt ? new Date(patient.createdAt.seconds * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '-'}
+                                </td>
+                                <td className="p-4 align-top text-right">
+                                  <ChevronRight size={20} className="ml-auto text-slate-400 group-hover:text-blue-600" />
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* CARDS (MOBILE) */}
+                      <div className="grid grid-cols-1 gap-4 md:hidden">
+                        {groupPatients.map((patient) => (
+                          <Card key={patient.id} onClick={() => openPatientDetails(patient)} className="hover:border-blue-300">
+                            <div className="p-4">
+                              <div className="flex justify-between items-start mb-2">
+                                <h3 className="font-bold text-slate-800">{patient.nome}</h3>
+                                <Badge status={patient.status} />
+                              </div>
+                              <p className="text-sm text-slate-600 mb-1">{patient.hipotese}</p>
+                              <p className="text-xs text-slate-400">Idade: {patient.idade} anos</p>
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                )}
+              </div>
+            )}
+          </div>
         )}
-      </div>
+      </main>
     </div>
-
-    {/* ATENÇÃO: Altere a linha abaixo para usar a nova função de filtragem */}
-    {patients.length === 0 ? (
-      // ... trecho de lista vazia ...
-    ) : (
-      <div className="space-y-8">
-        {getFilteredAndGroupedPatients().map(([shiftLabel, { info, patients: groupPatients }]) => (
-           // ... restante do mapeamento da lista ...
-        ))}
-      </div>
-    )}
-
+  );
+}
       <button
         onClick={handleLogout}
         className="text-slate-400 hover:text-red-500 transition-colors p-2 rounded-full hover:bg-red-50"
