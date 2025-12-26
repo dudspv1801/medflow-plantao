@@ -80,6 +80,7 @@ interface Patient {
   createdAt?: Timestamp;
   active: boolean;
   evolutions?: Evolution[];
+  documento?: string; // Linha adicionada
 }
 
 interface CardProps {
@@ -337,6 +338,8 @@ const InstallModal: React.FC<{ onClose: () => void }> = ({ onClose }) => (
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
+  const [userCRM] = useState('123456'); // Removido setUserCRM para limpar o aviso anterior
+  const [userUF] = useState('SP');      // Apenas uma declaração simples e sem o "set" não usado
   const [authError, setAuthError] = useState<string | null>(null);
 
   const [view, setView] = useState<'list' | 'form' | 'details'>('list');
@@ -566,7 +569,7 @@ export default function App() {
 
       await updateDoc(patientRef, {
         status: statusUpdateValue,
-        active: statusUpdateValue !== 'Alta',
+        active: !['Alta', 'Internado', 'Transferido'].includes(statusUpdateValue),
         evolutions: arrayUnion(newEvolution),
       });
 
@@ -664,7 +667,7 @@ export default function App() {
         ...formData,
         userId: user.uid, // Garante que o paciente é seu
         createdAt: serverTimestamp(),
-        active: formData.status !== 'Alta',
+        active: !['Alta', 'Internado', 'Transferido'].includes(formData.status),
         evolutions: [],
       });
       showNotification('Atendimento salvo!');
@@ -1125,17 +1128,40 @@ export default function App() {
                         <FileText size={18} className="text-blue-600" /> Relatório Médico
                       </h3>
                       <p className="text-xs text-slate-600 mb-4">Gere um relatório PDF do atendimento com assinatura digital.</p>
-                      <PDFDownloadLink
-                        document={<ServiceReportPDF atendimentoData={{ clinicName: 'MedFlow - Plantão Zero', professionalName: user?.displayName || 'Profissional', patientName: selectedPatient.nome, patientAge: selectedPatient.idade, patientId: selectedPatient.id, notes: `Queixa: ${selectedPatient.queixa}\n\nHDA: ${selectedPatient.hda}\n\nExame Físico: ${selectedPatient.exameFisico}\n\nHipótese: ${selectedPatient.hipotese}\n\nConduta: ${selectedPatient.conduta}`, date: selectedPatient.createdAt ? new Date(selectedPatient.createdAt.seconds * 1000).toISOString() : new Date().toISOString() }} auditHash={auditHash} />}
-                        fileName={`atendimento-${selectedPatient.nome.replace(/\s+/g, '_')}.pdf`}
-                      >
-                        {({ loading }) => (
-                          <button type="button" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed" disabled={loading}>
-                            <FileText size={16} />
-                            {loading ? 'Gerando PDF...' : 'Baixar PDF para Assinar'}
-                          </button>
-                        )}
-                      </PDFDownloadLink>
+<PDFDownloadLink
+  document={
+    <ServiceReportPDF 
+      atendimentoData={{ 
+        clinicName: 'MedFlow - Plantão Zero', 
+        professionalName: `${user?.displayName || 'Médico'} - CRM/${userCRM || '___'} - ${userUF || '___'}`, 
+        patientName: selectedPatient.nome || '', 
+        patientAge: selectedPatient.idade || '', 
+        patientId: selectedPatient.id || '',
+        patientDocument: selectedPatient.documento || '-', 
+        notes: `--- ADMISSÃO ---\nQueixa: ${selectedPatient.queixa || ''}\n\nHDA: ${selectedPatient.hda || ''}\n\nExame Físico: ${selectedPatient.exameFisico || ''}\n\nHipótese: ${selectedPatient.hipotese || ''}\n\nConduta: ${selectedPatient.conduta || ''}\n\n` + 
+               (selectedPatient.evolutions?.map((ev: any) => 
+                 `--- EVOLUÇÃO (${new Date(ev.createdAt).toLocaleString('pt-BR')}) ---\n${ev.text}`
+               ).join('\n\n') || ''),
+        date: selectedPatient.createdAt 
+          ? new Date(selectedPatient.createdAt.seconds * 1000).toISOString() 
+          : new Date().toISOString() 
+      }} 
+      auditHash={auditHash} 
+    />
+  }
+  fileName={`atendimento-${selectedPatient.nome.replace(/\s+/g, '_')}.pdf`}
+>
+  {({ loading }: { loading: boolean }) => (
+    <button 
+      type="button" 
+      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 transition-all disabled:opacity-50" 
+      disabled={loading}
+    >
+      <FileText size={16} />
+      {loading ? 'Gerando PDF...' : 'Baixar PDF para Assinar'}
+    </button>
+  )}
+</PDFDownloadLink>
                     </Card>
                     <div className="bg-green-50 p-4 rounded-xl border border-green-200 text-green-800 text-center">
                       <CheckCircle size={32} className="mx-auto mb-2 opacity-50" />

@@ -5,7 +5,6 @@ import {
   View,
   Text,
   StyleSheet,
-  PDFDownloadLink,
 } from '@react-pdf/renderer';
 
 export interface AtendimentoData {
@@ -16,7 +15,7 @@ export interface AtendimentoData {
   patientId?: string;
   patientDocument?: string;
   notes: string;
-  date?: string; // ISO string or any date-parsable value
+  date?: string; 
 }
 
 export interface ServiceReportPDFProps {
@@ -65,7 +64,6 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontSize: 11,
     lineHeight: 1.4,
-    whiteSpace: 'pre-wrap',
   },
   footer: {
     position: 'absolute',
@@ -115,8 +113,7 @@ export const ServiceReportPDF: React.FC<ServiceReportPDFProps> = ({ atendimentoD
             <Text style={styles.patientField}>Nome: {atendimentoData.patientName}</Text>
             <Text style={styles.patientField}>Idade: {atendimentoData.patientAge ?? '-'}</Text>
           </View>
-          <View style={[styles.patientRow, { marginTop: 6 }]}
-          >
+          <View style={[styles.patientRow, { marginTop: 6 }]}>
             <Text style={styles.patientField}>ID: {atendimentoData.patientId ?? '-'}</Text>
             <Text style={styles.patientField}>Documento: {atendimentoData.patientDocument ?? '-'}</Text>
           </View>
@@ -137,26 +134,6 @@ export const ServiceReportPDF: React.FC<ServiceReportPDFProps> = ({ atendimentoD
         </View>
       </Page>
     </Document>
-  );
-};
-
-export const ServiceReportPDFDownload: React.FC<{
-  atendimentoData: AtendimentoData;
-  auditHash: string;
-  fileName?: string;
-}> = ({ atendimentoData, auditHash, fileName }) => {
-  const safeName = (atendimentoData.patientName || 'report').replace(/\s+/g, '_');
-  const finalName = fileName ?? `atendimento-${safeName}.pdf`;
-
-  return (
-    <PDFDownloadLink
-      document={<ServiceReportPDF atendimentoData={atendimentoData} auditHash={auditHash} />}
-      fileName={finalName}
-    >
-      {({ loading }) => (
-        <button type="button">{loading ? 'Gerando PDF…' : 'Download PDF'}</button>
-      )}
-    </PDFDownloadLink>
   );
 };
 
