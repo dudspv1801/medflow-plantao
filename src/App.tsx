@@ -20,6 +20,8 @@ import {
   updateDoc,
   arrayUnion,
   Timestamp,
+  query,
+  where,
 } from 'firebase/firestore';
 import {
   Clipboard,
@@ -462,9 +464,11 @@ export default function App() {
     }
   };
 
-  useEffect(() => {
+ useEffect(() => {
     if (!user) return;
-    const q = collection(
+
+    // 1. Criamos a referência da coleção
+    const collectionRef = collection(
       db,
       'artifacts',
       appId,
@@ -472,6 +476,10 @@ export default function App() {
       'data',
       'consultas_medicas'
     );
+
+    // 2. Criamos a QUERY (o filtro) para buscar só onde o userId é igual ao id do médico logado
+    const q = query(collectionRef, where("userId", "==", user.uid));
+
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
@@ -480,9 +488,11 @@ export default function App() {
           ...doc.data(),
         })) as Patient[];
 
+        // Ordenamos manualmente para evitar erros de índice composto inicialmente
         data.sort(
           (a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
         );
+        
         setPatients(data);
 
         if (selectedPatient) {
@@ -492,7 +502,7 @@ export default function App() {
       },
       (error) => {
         console.error('Erro ao buscar pacientes:', error);
-        showNotification('Erro de conexão', 'error');
+        showNotification('Erro de conexão ou falta de permissão', 'error');
       }
     );
     return () => unsubscribe();
