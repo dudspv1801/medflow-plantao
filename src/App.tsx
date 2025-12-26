@@ -37,7 +37,6 @@ import {
   Stethoscope,
   BedDouble,
   Ambulance,
-  ArrowLeft,
   MessageSquare,
   Send,
   History,
