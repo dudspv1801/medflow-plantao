@@ -1,0 +1,28 @@
+/* --- RESET PARA LAYOUT FULL-WIDTH --- */
+
+/* Garante que o elemento raiz do React ocupe toda a largura */
+#root {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  text-align: left; /* Remove alinhamento centralizado padrão do Vite */
+}
+
+/* Remove margens do navegador e garante que o body ocupe a tela toda */
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100vh;
+  display: block; /* Remove 'flex' que alguns templates trazem */
+  background-color: #f8fafc; /* Cor de fundo slate-50 para evitar flash branco */
+}
+
+/* Garante que inputs e botões herdem a fonte correta */
+input,
+button,
+textarea,
+select {
+  font-family: inherit;
+}
