@@ -1135,84 +1135,86 @@ export default function App() {
                 </div>
               </div>
               <div className="lg:col-span-1">
-                {selectedPatient.status !== 'Alta' ? (
-                  <Card className="p-4 sticky top-24 border-t-4 border-t-green-500">
-                    <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
-                      <PlusCircle size={18} className="text-green-600" /> Nova Evolução
-                    </h3>
-                    <p className="text-xs text-slate-500 mb-4">Registre a melhora clínica, resultados de exames ou novas condutas.</p>
-                    <textarea
-                      value={evolutionText}
-                      onChange={(e) => setEvolutionText(e.target.value)}
-                      className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none min-h-[150px] text-sm mb-3"
-                      placeholder="Ex: Paciente refere melhora da dor. Troponina negativa. Mantenho em observação..."
-                    />
-                    <button
-                      onClick={handleAddEvolution}
-                      disabled={loading || !evolutionText.trim()}
-                      className="w-full bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {loading ? 'Salvando...' : (<><Send size={16} /> Salvar Evolução</>)}
-                    </button>
-                  </Card>
-                ) : (
-                  <>
-                    <Card className="p-4 mb-4 bg-blue-50 border-t-4 border-t-blue-500">
-                      <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
-                        <FileText size={18} className="text-blue-600" /> Relatório Médico
-                      </h3>
-                      <p className="text-xs text-slate-600 mb-4">Gere um relatório PDF do atendimento com assinatura digital.</p>
-<PDFDownloadLink
-  document={
-    <ServiceReportPDF 
-      atendimentoData={{ 
-        clinicName: 'MedFlow - Plantão Zero', 
-        professionalName: `${user?.displayName || 'Médico'} - CRM/${userCRM || '___'} - ${userUF || '___'}`, 
-        patientName: selectedPatient.nome || '', 
-        patientAge: selectedPatient.idade || '', 
-        patientId: selectedPatient.id || '',
-        patientDocument: selectedPatient.documento || '-', 
-        notes: `--- ADMISSÃO ---\nQueixa: ${selectedPatient.queixa || ''}\n\nHDA: ${selectedPatient.hda || ''}\n\nExame Físico: ${selectedPatient.exameFisico || ''}\n\nHipótese: ${selectedPatient.hipotese || ''}\n\nConduta: ${selectedPatient.conduta || ''}\n\n` + 
-               (selectedPatient.evolutions?.map((ev: any) => 
-                 `--- EVOLUÇÃO (${new Date(ev.createdAt).toLocaleString('pt-BR')}) ---\n${ev.text}`
-               ).join('\n\n') || ''),
-        date: selectedPatient.createdAt 
-          ? new Date(selectedPatient.createdAt.seconds * 1000).toISOString() 
-          : new Date().toISOString() 
-      }} 
-      auditHash={auditHash} 
-    />
-  }
-  fileName={`atendimento-${selectedPatient.nome.replace(/\s+/g, '_')}.pdf`}
->
-  {({ loading }: { loading: boolean }) => (
-    <button 
-      type="button" 
-      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 transition-all disabled:opacity-50" 
-      disabled={loading}
+  {/* O bloco do PDF fica agora fora de qualquer condição para aparecer sempre */}
+  <Card className="p-4 mb-4 bg-blue-50 border-t-4 border-t-blue-500">
+    <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
+      <FileText size={18} className="text-blue-600" /> Relatório Médico
+    </h3>
+    <p className="text-xs text-slate-600 mb-4">Gere um relatório PDF do atendimento com assinatura digital.</p>
+    <PDFDownloadLink
+      document={
+        <ServiceReportPDF 
+          atendimentoData={{ 
+            clinicName: 'MedFlow - Plantão Zero', 
+            professionalName: `${user?.displayName || 'Médico'} - CRM/${userCRM || '___'} - ${userUF || '___'}`, 
+            patientName: selectedPatient.nome || '', 
+            patientAge: selectedPatient.idade || '', 
+            patientId: selectedPatient.id || '',
+            patientDocument: (selectedPatient as any).documento || '-', 
+            notes: `--- ADMISSÃO ---\nQueixa: ${selectedPatient.queixa || ''}\n\nHDA: ${selectedPatient.hda || ''}\n\nExame Físico: ${selectedPatient.exameFisico || ''}\n\nHipótese: ${selectedPatient.hipotese || ''}\n\nConduta: ${selectedPatient.conduta || ''}\n\n` + 
+                   (selectedPatient.evolutions?.map((ev: any) => 
+                     `--- EVOLUÇÃO (${new Date(ev.createdAt).toLocaleString('pt-BR')}) ---\n${ev.text}`
+                   ).join('\n\n') || ''),
+            date: selectedPatient.createdAt 
+              ? new Date(selectedPatient.createdAt.seconds * 1000).toISOString() 
+              : new Date().toISOString() 
+          }} 
+          auditHash={auditHash} 
+        />
+      }
+      fileName={`atendimento-${selectedPatient.nome.replace(/\s+/g, '_')}.pdf`}
     >
-      <FileText size={16} />
-      {loading ? 'Gerando PDF...' : 'Baixar PDF para Assinar'}
-    </button>
+      {({ loading }) => (
+        <button 
+          type="button" 
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 transition-all disabled:opacity-50" 
+          disabled={loading}
+        >
+          <FileText size={16} />
+          {loading ? 'Gerando PDF...' : 'Baixar PDF para Assinar'}
+        </button>
+      )}
+    </PDFDownloadLink>
+  </Card>
+
+  {/* A condição abaixo agora serve apenas para mostrar a Evolução ou a mensagem de Alta */}
+  {selectedPatient.status !== 'Alta' ? (
+    <Card className="p-4 sticky top-24 border-t-4 border-t-green-500">
+      <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
+        <PlusCircle size={18} className="text-green-600" /> Nova Evolução
+      </h3>
+      <p className="text-xs text-slate-500 mb-4">Registre a melhora clínica ou novas condutas.</p>
+      <textarea
+        value={evolutionText}
+        onChange={(e) => setEvolutionText(e.target.value)}
+        className="w-full p-3 border border-slate-300 rounded-lg outline-none min-h-[150px] text-sm mb-3"
+        placeholder="Ex: Paciente refere melhora da dor..."
+      />
+      <button
+        onClick={handleAddEvolution}
+        disabled={loading || !evolutionText.trim()}
+        className="w-full bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg font-medium flex items-center justify-center gap-2"
+      >
+        {loading ? 'Salvando...' : <><Send size={16} /> Salvar Evolução</>}
+      </button>
+    </Card>
+  ) : (
+    <div className="bg-green-50 p-4 rounded-xl border border-green-200 text-green-800 text-center">
+      <CheckCircle size={32} className="mx-auto mb-2 opacity-50" />
+      <p className="font-medium">Paciente recebeu alta.</p>
+      <p className="text-sm opacity-75">Não é possível adicionar novas evoluções.</p>
+    </div>
   )}
-</PDFDownloadLink>
-                    </Card>
-                    <div className="bg-green-50 p-4 rounded-xl border border-green-200 text-green-800 text-center">
-                      <CheckCircle size={32} className="mx-auto mb-2 opacity-50" />
-                      <p className="font-medium">Paciente recebeu alta.</p>
-                      <p className="text-sm opacity-75">Não é possível adicionar evoluções.</p>
-                    </div>
-                  </>
-                )}
-                {selectedPatient.pendencias && (
-                  <div className="mt-4 bg-orange-50 p-4 rounded-xl border border-orange-200">
-                    <h4 className="font-bold text-orange-800 text-sm mb-2 flex items-center gap-2">
-                      <AlertCircle size={14} /> Pendências Iniciais
-                    </h4>
-                    <p className="text-sm text-orange-900">{selectedPatient.pendencias}</p>
-                  </div>
-                )}
-              </div>
+
+  {selectedPatient.pendencias && (
+    <div className="mt-4 bg-orange-50 p-4 rounded-xl border border-orange-200">
+      <h4 className="font-bold text-orange-800 text-sm mb-2 flex items-center gap-2">
+        <AlertCircle size={14} /> Pendências Iniciais
+      </h4>
+      <p className="text-sm text-orange-900">{selectedPatient.pendencias}</p>
+    </div>
+  )}
+</div>
             </div>
           </div>
         )}
