@@ -1262,7 +1262,7 @@ export default function App() {
           </button>
         )}
       </div>
-    ) : (
+    )
       <div className="space-y-8">
         {/* Aqui continua o seu .map anterior que exibe os grupos de plantão */}
             </div>
