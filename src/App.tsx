@@ -338,8 +338,8 @@ const InstallModal: React.FC<{ onClose: () => void }> = ({ onClose }) => (
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [userCRM] = useState('123456'); // Removido setUserCRM para limpar o aviso anterior
-  const [userUF] = useState('SP');      // Apenas uma declaração simples e sem o "set" não usado
+  const [userCRM, setUserCRM] = useState('');
+  const [userUF, setUserUF] = useState('SP');
   const [authError, setAuthError] = useState<string | null>(null);
 
   const [view, setView] = useState<'list' | 'form' | 'details'>('list');
@@ -918,6 +918,40 @@ export default function App() {
                   <Input label="Nome" name="nome" value={formData.nome} onChange={handleInputChange} required />
                   <Input label="Idade" name="idade" value={formData.idade} onChange={handleInputChange} type="number" />
                 </Card>
+                <Card className="p-4">
+  <h3 className="font-semibold text-slate-700 mb-4 flex items-center gap-2">
+    <Stethoscope size={18} className="text-blue-500" /> Identificação do Médico
+  </h3>
+  <div className="grid grid-cols-2 gap-3">
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-slate-700 mb-1">Seu CRM</label>
+      <input
+        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+        value={userCRM}
+        onChange={(e) => setUserCRM(e.target.value)}
+        placeholder="Ex: 123456"
+      />
+    </div>
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-slate-700 mb-1">UF</label>
+      <select
+        className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
+        value={userUF}
+        onChange={(e) => setUserUF(e.target.value)}
+      >
+        <option value="AC">AC</option><option value="AL">AL</option><option value="AP">AP</option>
+        <option value="AM">AM</option><option value="BA">BA</option><option value="CE">CE</option>
+        <option value="DF">DF</option><option value="ES">ES</option><option value="GO">GO</option>
+        <option value="MA">MA</option><option value="MT">MT</option><option value="MS">MS</option>
+        <option value="MG">MG</option><option value="PA">PA</option><option value="PB">PB</option>
+        <option value="PR">PR</option><option value="PE">PE</option><option value="PI">PI</option>
+        <option value="RJ">RJ</option><option value="RN">RN</option><option value="RS">RS</option>
+        <option value="RO">RO</option><option value="RR">RR</option><option value="SC">SC</option>
+        <option value="SP">SP</option><option value="SE">SE</option><option value="TO">TO</option>
+      </select>
+    </div>
+  </div>
+</Card>
                 <Card className="p-4">
                   <h3 className="font-semibold text-slate-700 mb-4 flex items-center gap-2">
                     <Activity size={18} className="text-red-500" /> Sinais Vitais
