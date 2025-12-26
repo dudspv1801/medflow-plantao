@@ -358,6 +358,7 @@ export default function App() {
     type: 'success' | 'error';
   } | null>(null);
   const [evolutionText, setEvolutionText] = useState('');
+  const [searchTerm, setSearchTerm] = useState(''); // Estado para o texto da busca
   const [showInstallModal, setShowInstallModal] = useState(false);
   const [showDischarged, setShowDischarged] = useState(false);
 
@@ -680,9 +681,33 @@ export default function App() {
 };
 
   const getGroupedPatients = () => {
-    const filtered = patients.filter(
-      (p) => showDischarged || p.status !== 'Alta'
-    );
+    const getFilteredAndGroupedPatients = () => {
+  // 1. Primeiro filtra por Alta/Ativos e pelo Termo de Pesquisa
+  const filtered = patients.filter((p) => {
+    const matchesSearch = p.nome.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = showDischarged || p.status !== 'Alta';
+    return matchesSearch && matchesStatus;
+  });
+
+  const grouped: Record<string, { info: any; patients: Patient[] }> = {};
+
+  filtered.forEach((patient) => {
+    const date = patient.createdAt
+      ? new Date(patient.createdAt.seconds * 1000)
+      : new Date();
+    const shiftInfo = getShiftInfo(date);
+    const key = shiftInfo.label;
+
+    if (!grouped[key]) {
+      grouped[key] = { info: shiftInfo, patients: [] };
+    }
+    grouped[key].patients.push(patient);
+  });
+
+  return Object.entries(grouped).sort(
+    ([, a], [, b]) => b.info.rawDate - a.info.rawDate
+  );
+};
 
     const grouped: Record<string, { info: any; patients: Patient[] }> = {};
 
@@ -783,19 +808,62 @@ export default function App() {
 
       <div className="h-6 w-px bg-slate-200 mx-1"></div>
 
-      {view !== 'list' && (
-  <button
-    onClick={() => {
-      setSelectedPatient(null);
-      setEvolutionText('');
-      setView('list');
-    }}
-    className="px-3 py-1.5 rounded-md flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-all"
-  >
-    <ArrowLeft size={16} />
-    <span className="hidden sm:inline">Voltar</span>
-  </button>
-)}
+     {view === 'list' && (
+  <div className="animate-in fade-in duration-300">
+    <div className="flex flex-col gap-6 mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800">Lista de Pacientes</h2>
+          <p className="text-slate-500 text-sm">Organizado por turno e admissão</p>
+        </div>
+        
+        {/* BOTÃO DE FILTRAR ALTA (Já existente, mantido aqui) */}
+        <button
+          onClick={() => setShowDischarged(!showDischarged)}
+          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all border ${
+            showDischarged
+              ? 'bg-slate-200 text-slate-700 border-slate-300'
+              : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
+          }`}
+        >
+          <Filter size={16} />
+          {showDischarged ? 'Ocultar Altas' : 'Mostrar Altas'}
+        </button>
+      </div>
+
+      {/* BARRA DE PESQUISA (Nova) */}
+      <div className="relative w-full">
+        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <Filter size={18} className="text-slate-400" /> {/* Ou use o ícone Search se tiver importado */}
+        </div>
+        <input
+          type="text"
+          placeholder="Pesquisar paciente pelo nome..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="block w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl leading-5 bg-white shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-all"
+        />
+        {searchTerm && (
+          <button 
+            onClick={() => setSearchTerm('')}
+            className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+          >
+            <X size={16} />
+          </button>
+        )}
+      </div>
+    </div>
+
+    {/* ATENÇÃO: Altere a linha abaixo para usar a nova função de filtragem */}
+    {patients.length === 0 ? (
+      // ... trecho de lista vazia ...
+    ) : (
+      <div className="space-y-8">
+        {getFilteredAndGroupedPatients().map(([shiftLabel, { info, patients: groupPatients }]) => (
+           // ... restante do mapeamento da lista ...
+        ))}
+      </div>
+    )}
 
       <button
         onClick={handleLogout}
