@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
-// Removi o import do CSS para evitar o erro de compilação no ambiente, 
-// mas injetarei os estilos necessários diretamente no código para garantir o layout.
 import { 
   getAuth, 
   onAuthStateChanged, 
@@ -23,11 +21,11 @@ import {
   Timestamp
 } from 'firebase/firestore';
 import { 
-  PlusCircle, Users, Activity, Clock, FileText, 
+  PlusCircle, Users, Activity, Clock, 
   LogOut, Stethoscope, ArrowLeft, Send, History, 
-  Share, X, ChevronRight, Sun, Moon, Edit2, Trash2, Search, 
+  ChevronRight, Sun, Moon, Edit2, Trash2, Search, 
   Brain, Lock, FileDown, ShieldCheck, Smartphone, 
-  CheckCircle, AlertCircle, BedDouble, Ambulance, Save, Clipboard, Filter
+  CheckCircle, BedDouble, Ambulance, Filter
 } from 'lucide-react';
 
 // --- CONFIGURAÇÃO FIREBASE ---
@@ -135,15 +133,6 @@ const TextArea: React.FC<any> = ({ label, required, ...props }) => (
   <div className="mb-4">
     <Label required={required}>{label}</Label>
     <textarea className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-slate-800 dark:text-slate-100 min-h-[100px]" {...props} />
-  </div>
-);
-
-const Select: React.FC<any> = ({ label, options, required, ...props }) => (
-  <div className="mb-4">
-    <Label required={required}>{label}</Label>
-    <select className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-slate-800 dark:text-slate-100 font-bold" {...props}>
-      {options.map((opt: any) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-    </select>
   </div>
 );
 
@@ -442,7 +431,7 @@ export default function App() {
           <div className="space-y-8">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <h2 className="text-3xl font-black tracking-tight dark:text-white">Censo Privado</h2>
-              <button onClick={() => setShowDischarged(!showDischarged)} className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"><Filter size={14}/> {showDischarged ? 'OCULTAR ALTAS' : 'MOSTRAR ALTAS'}</button>
+              <button onClick={() => setShowDischarged(!showDischarged)} className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400"><Filter size={14}/> {showDischarged ? 'OCULTAR ALTAS' : 'MOSTRAR ALTAS'}</button>
             </div>
 
             {filteredPatients.length === 0 ? (
