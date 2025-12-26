@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
+// Removido o import do App.css para evitar erro de resolução no ambiente de build.
+// Os estilos serão injetados dinamicamente no useEffect abaixo.
 import { 
   getAuth, 
   onAuthStateChanged, 
@@ -25,7 +27,7 @@ import {
   LogOut, Stethoscope, ArrowLeft, Send, History, 
   ChevronRight, Sun, Moon, Edit2, Trash2, Search, 
   Brain, Lock, FileDown, ShieldCheck, Smartphone, 
-  CheckCircle, BedDouble, Ambulance, Filter, Clipboard
+  CheckCircle, BedDouble, Ambulance, Filter, FileText, Share, X
 } from 'lucide-react';
 
 // --- CONFIGURAÇÃO FIREBASE ---
@@ -43,7 +45,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = "plantao-zero-app";
-const apiKey = ""; // Gemini API Key (providenciada pelo ambiente)
+const apiKey = ""; // Gemini API Key
 
 // --- TIPAGENS ---
 interface VitalRecord {
@@ -96,7 +98,7 @@ const callGemini = async (prompt: string, retryCount = 0): Promise<string> => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        systemInstruction: { parts: [{ text: "Você é um assistente médico especialista em CID-10. Retorne apenas o código e o nome da doença de forma curta." }] }
+        systemInstruction: { parts: [{ text: "Você é um assistente médico especialista em CID-10. Retorne apenas o código e o nome da doença." }] }
       })
     });
     if (!response.ok && retryCount < 3) return callGemini(prompt, retryCount + 1);
@@ -161,9 +163,8 @@ const Badge: React.FC<{ status: string }> = ({ status }) => {
   );
 };
 
-// --- GRÁFICO TENDÊNCIAS ---
 const SparkLine = ({ data, color }: { data: number[], color: string }) => {
-  if (!data || data.length < 2) return <div className="text-[10px] opacity-40 italic">Iniciando dados...</div>;
+  if (!data || data.length < 2) return <div className="text-[10px] opacity-40 italic">Processando histórico...</div>;
   const min = Math.min(...data);
   const max = Math.max(...data);
   const range = (max - min) || 1;
@@ -174,6 +175,35 @@ const SparkLine = ({ data, color }: { data: number[], color: string }) => {
     </svg>
   );
 };
+
+const InstallModal: React.FC<{ onClose: () => void }> = ({ onClose }) => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in slide-in-from-bottom-10 duration-300">
+      <div className="p-4 bg-blue-600 text-white flex justify-between items-center">
+        <h3 className="font-bold text-lg flex items-center gap-2">
+          <Smartphone size={20} />
+          Instalar App
+        </h3>
+        <button onClick={onClose} className="p-1 hover:bg-blue-700 rounded-full transition-colors">
+          <X size={20} />
+        </button>
+      </div>
+      <div className="p-6 space-y-6">
+        <p className="text-slate-600 dark:text-slate-300 text-sm">Adicione o MedFlow ao ecrã inicial para acesso rápido.</p>
+        <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+          <h4 className="font-bold text-slate-800 dark:text-slate-100 mb-2">iOS / Android</h4>
+          <ol className="text-xs text-slate-600 dark:text-slate-400 space-y-2 list-decimal list-inside">
+            <li>Toque no botão <Share size={12} className="inline mx-1"/> Partilhar.</li>
+            <li>Selecione "Adicionar ao Ecrã Principal".</li>
+          </ol>
+        </div>
+      </div>
+      <div className="p-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-center">
+        <button onClick={onClose} className="text-blue-600 font-bold text-sm hover:underline">Entendido</button>
+      </div>
+    </div>
+  </div>
+);
 
 // --- COMPONENTE PRINCIPAL ---
 
@@ -188,8 +218,8 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isLocked, setIsLocked] = useState(false);
   const [showDischarged, setShowDischarged] = useState(false);
+  const [showInstallModal, setShowInstallModal] = useState(false);
   
-  // Modais
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [statusUpdateValue, setStatusUpdateValue] = useState('');
   const [statusJustification, setStatusJustification] = useState('');
@@ -203,19 +233,20 @@ export default function App() {
   const [formData, setFormData] = useState(initialFormState);
   const [evolutionText, setEvolutionText] = useState('');
 
-  // --- CONTROLO DE TEMA E INJEÇÃO DE CSS ---
+  // --- CONTROLO DE TEMA E INJEÇÃO DE ESTILOS ---
   useEffect(() => {
     const root = window.document.documentElement;
     if (isDarkMode) root.classList.add('dark'); else root.classList.remove('dark');
     localStorage.setItem('medflow-theme', isDarkMode ? 'dark' : 'light');
 
-    const styleId = 'medflow-critical-styles';
+    // Injeção de estilos críticos para garantir largura total e evitar desconfiguração
+    const styleId = 'medflow-global-inject';
     if (!document.getElementById(styleId)) {
       const style = document.createElement('style');
       style.id = styleId;
       style.innerHTML = `
         #root { width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; display: block !important; text-align: left !important; }
-        body { margin: 0; padding: 0; width: 100%; min-height: 100vh; display: block; overflow-x: hidden; background-color: #f8fafc; transition: background-color 0.3s; }
+        body { margin: 0; padding: 0; min-height: 100vh; overflow-x: hidden; background-color: #f8fafc; transition: background-color 0.3s; }
         .dark body { background-color: #0f172a; color: #f8fafc; }
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
@@ -264,7 +295,7 @@ export default function App() {
         const up = data.find(p => p.id === selectedPatient.id);
         if (up) setSelectedPatient(up);
       }
-    }, (error) => console.error("Firestore Error:", error));
+    });
   }, [user, selectedPatient?.id]);
 
   // --- AÇÕES ---
@@ -297,7 +328,7 @@ export default function App() {
     setLoading(true);
     try {
       const vital: VitalRecord = { pa: formData.pa, fc: formData.fc, sat: formData.sat, temp: formData.temp, timestamp: new Date().toISOString() };
-      const log: AuditEntry = { action: 'ADMISSÃO', timestamp: new Date().toISOString(), details: 'Registo inicial criado.' };
+      const log: AuditEntry = { action: 'ADMISSÃO', timestamp: new Date().toISOString(), details: 'Paciente admitido.' };
       await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'consultas_medicas'), {
         ...formData,
         userId: user.uid,
@@ -322,8 +353,7 @@ export default function App() {
     const result = await callGemini(`Sugira o código CID-10 para a hipótese: "${hip}". Retorne apenas o código e o nome.`);
     if (view === 'form') setFormData({...formData, hipotese: `${formData.hipotese} (Sugestão CID: ${result})`});
     else if (selectedPatient) {
-       const pRef = doc(db, 'artifacts', appId, 'users', user!.uid, 'consultas_medicas', selectedPatient.id);
-       await updateDoc(pRef, { hipotese: `${selectedPatient.hipotese} (Sugestão CID: ${result})` });
+       await updateDoc(doc(db, 'artifacts', appId, 'users', user!.uid, 'consultas_medicas', selectedPatient.id), { hipotese: `${selectedPatient.hipotese} (Sugestão CID: ${result})` });
     }
     setIsCidLoading(false);
   };
@@ -337,7 +367,6 @@ export default function App() {
     a.href = url;
     a.download = `medflow_${selectedPatient.nome.replace(/\s/g, '_')}.txt`;
     a.click();
-    showNotification("Relatório gerado!");
   };
 
   const filteredPatients = useMemo(() => {
@@ -362,18 +391,18 @@ export default function App() {
   // --- BLOQUEIO ---
   if (isLocked) return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 text-white p-6">
-      <div className="bg-slate-900 p-12 rounded-[3rem] border border-slate-800 shadow-2xl text-center animate-in zoom-in duration-300">
+      <div className="bg-slate-900 p-12 rounded-[3rem] border border-slate-800 shadow-2xl text-center">
         <Lock size={64} className="mx-auto mb-8 text-blue-500" />
         <h2 className="text-2xl font-black mb-4">Sessão Bloqueada</h2>
         <input type="password" maxLength={4} className="w-40 text-center text-4xl font-black bg-slate-800 border-2 border-slate-700 rounded-3xl p-4 focus:border-blue-500 outline-none mb-4 text-white" autoFocus onChange={(e) => { if (e.target.value === '1234') setIsLocked(false); }} />
-        <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest">PIN de Segurança Padrão: 1234</p>
+        <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest">PIN Padrão: 1234</p>
       </div>
     </div>
   );
 
   if (!user) return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-blue-700 to-indigo-950 w-full p-4">
-      <Card className="w-full max-w-md p-10 text-center mx-auto shadow-2xl bg-white/95 border-0 animate-in fade-in duration-500">
+      <Card className="w-full max-w-md p-10 text-center mx-auto shadow-2xl bg-white/95 border-0">
         <div className="bg-blue-600 text-white p-5 rounded-[2rem] w-20 h-20 flex items-center justify-center mx-auto mb-8 shadow-xl"><Stethoscope size={44} /></div>
         <h1 className="text-4xl font-black text-slate-800 mb-2 tracking-tighter">MedFlow</h1>
         <p className="text-slate-500 mb-12 font-medium leading-tight">Gestão Privada de Plantão Médico</p>
@@ -398,7 +427,7 @@ export default function App() {
 
           <div className="flex items-center gap-2 shrink-0">
              <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-200 transition-all shadow-sm"><Sun size={20} className="hidden dark:block"/><Moon size={20} className="dark:hidden"/></button>
-             <button className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 shadow-sm"><Smartphone size={20} /></button>
+             <button onClick={() => setShowInstallModal(true)} className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 shadow-sm"><Smartphone size={20} /></button>
              {view === 'list' && <button onClick={() => setView('form')} className="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 hover:bg-blue-700 shadow-lg active:scale-95 transition-all"><PlusCircle size={16} /> <span className="hidden sm:inline uppercase tracking-widest">ADMITIR</span></button>}
              {view !== 'list' && <button onClick={goBackToList} className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 transition-all shadow-sm"><ArrowLeft size={20} /></button>}
              <button onClick={() => signOut(auth)} className="p-2 text-slate-400 hover:text-red-500 transition-colors ml-1"><LogOut size={22} /></button>
@@ -410,16 +439,18 @@ export default function App() {
         <div className={`fixed top-6 right-6 z-50 px-6 py-4 rounded-2xl shadow-2xl text-white text-sm font-black animate-in slide-in-from-right fade-in duration-300 ${notification.type === 'error' ? 'bg-red-500' : 'bg-emerald-600'}`}>{notification.message}</div>
       )}
 
+      {showInstallModal && <InstallModal onClose={() => setShowInstallModal(false)} />}
+
       {/* MODAL STATUS */}
       {isStatusModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white dark:bg-slate-800 rounded-[2.5rem] w-full max-w-md shadow-2xl p-8 animate-in zoom-in-95 duration-200">
-            <h3 className="font-black text-xl mb-6 flex items-center gap-3 dark:text-white"><Edit2 className="text-blue-500" /> Alterar Status</h3>
+            <h3 className="font-black text-xl mb-6 flex items-center gap-3 dark:text-white"><Edit2 className="text-blue-500" /> Status</h3>
             <div className="space-y-6">
                <select className="w-full p-4 rounded-2xl border-2 border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 font-bold dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" value={statusUpdateValue} onChange={(e) => setStatusUpdateValue(e.target.value)}>
                   <option value="Alta">Alta</option><option value="Observação">Observação</option><option value="Aguardando Vaga">Vaga</option><option value="Internado">Internado</option>
                </select>
-               <textarea className="w-full p-4 rounded-2xl border-2 border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 min-h-[100px] dark:text-white font-medium focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Motivo da alteração..." value={statusJustification} onChange={(e) => setStatusJustification(e.target.value)} />
+               <textarea className="w-full p-4 rounded-2xl border-2 border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 min-h-[100px] dark:text-white font-medium focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Motivo..." value={statusJustification} onChange={(e) => setStatusJustification(e.target.value)} />
                <div className="flex gap-4">
                   <button onClick={() => setIsStatusModalOpen(false)} className="flex-1 py-4 font-black text-slate-400 hover:text-slate-600 transition-colors">CANCELAR</button>
                   <button onClick={handleUpdateStatus} disabled={!statusJustification.trim() || loading} className="flex-1 bg-blue-600 text-white rounded-2xl font-black shadow-lg shadow-blue-500/20 disabled:opacity-50">SALVAR</button>
@@ -433,7 +464,7 @@ export default function App() {
         {view === 'list' && (
           <div className="space-y-8">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div><h2 className="text-3xl font-black tracking-tight dark:text-white">Censo Privado</h2><p className="text-slate-500 dark:text-slate-400 font-bold italic text-sm">{user.email}</p></div>
+              <h2 className="text-3xl font-black tracking-tight dark:text-white">Censo Privado</h2>
               <button onClick={() => setShowDischarged(!showDischarged)} className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 transition-all hover:bg-slate-50 dark:hover:bg-slate-700"><Filter size={14}/> {showDischarged ? 'OCULTAR ALTAS' : 'MOSTRAR ALTAS'}</button>
             </div>
 
@@ -463,7 +494,7 @@ export default function App() {
         {view === 'form' && (
           <form onSubmit={handleSubmit} className="max-w-5xl mx-auto space-y-8 animate-in slide-in-from-bottom-10 duration-500">
              <div className="flex justify-between items-end bg-white dark:bg-slate-800 p-8 rounded-[2.5rem] shadow-sm border border-slate-200 dark:border-slate-700">
-               <div><h2 className="text-4xl font-black tracking-tight dark:text-white leading-none mb-2">Admissão</h2><p className="text-slate-500 font-bold italic text-sm">O rascunho é guardado automaticamente enquanto escreve.</p></div>
+               <div><h2 className="text-4xl font-black tracking-tight dark:text-white mb-2">Admissão</h2><p className="text-slate-500 font-bold italic text-sm">O rascunho é guardado automaticamente enquanto escreve.</p></div>
                <div className="flex gap-3">
                  <button type="button" onClick={suggestCid} disabled={isCidLoading} title="Sugerir CID" className="p-4 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded-2xl hover:scale-105 transition-all shadow-sm"><Brain size={24} /></button>
                  <button type="button" onClick={() => { if(confirm("Limpar rascunho?")) { setFormData(initialFormState); localStorage.removeItem('medflow-draft'); } }} className="p-4 bg-red-50 dark:bg-red-900/30 text-red-500 dark:text-red-400 rounded-2xl hover:bg-red-100 transition-all shadow-sm"><Trash2 size={24} /></button>
@@ -485,9 +516,12 @@ export default function App() {
                      <h3 className="font-black text-xl text-blue-400 mb-8 border-b border-slate-800 pb-4 flex items-center gap-2"><Stethoscope size={22}/> Admissão Clínica</h3>
                      <TextArea label="Hipótese Diagnóstica" value={formData.hipotese} onChange={(e:any) => setFormData({...formData, hipotese: e.target.value})} placeholder="Quadro clínico inicial..." required />
                      <TextArea label="Conduta Proposta" value={formData.conduta} onChange={(e:any) => setFormData({...formData, conduta: e.target.value})} placeholder="Plano de tratamento..." required />
-                     <div className="mb-6"><Label>Status Inicial</Label><select className="w-full p-4 rounded-2xl bg-slate-950 border-2 border-slate-800 text-white font-black outline-none focus:border-blue-500" value={formData.status} onChange={(e:any) => setFormData({...formData, status: e.target.value})}>
-                        <option value="Alta">Alta</option><option value="Observação">Em Observação</option><option value="Aguardando Vaga">Aguardando Vaga</option><option value="Internado">Internado</option>
-                     </select></div>
+                     <div className="mb-6">
+                        <label className="block text-sm font-bold mb-1">Status Inicial</label>
+                        <select className="w-full p-4 rounded-2xl bg-slate-950 border-2 border-slate-800 text-white font-black outline-none focus:border-blue-500" value={formData.status} onChange={(e:any) => setFormData({...formData, status: e.target.value})}>
+                          <option value="Alta">Alta</option><option value="Observação">Em Observação</option><option value="Aguardando Vaga">Aguardando Vaga</option><option value="Internado">Internado</option>
+                        </select>
+                     </div>
                      <button type="submit" disabled={loading} className="w-full bg-blue-600 py-5 rounded-3xl font-black text-lg hover:bg-blue-500 shadow-xl transition-all active:scale-95 disabled:opacity-50 uppercase tracking-widest">GUARDAR ADMISSÃO</button>
                   </Card>
                </div>
@@ -576,7 +610,7 @@ export default function App() {
                                     const text = `PACIENTE: ${selectedPatient.nome}\nVITAI: ${vitals}\nHD: ${selectedPatient.hipotese}\nCONDUTA: ${selectedPatient.conduta}\nSTATUS: ${selectedPatient.status}`;
                                     const el = document.createElement('textarea'); el.value = text; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el);
                                     showNotification("Prontuário copiado!");
-                                  }} title="Copiar prontuário rápido" className="p-5 rounded-3xl bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300 transition-all shadow-lg active:scale-90"><Clipboard size={28} /></button>
+                                  }} title="Copiar prontuário rápido" className="p-5 rounded-3xl bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300 transition-all shadow-lg active:scale-90"><FileText size={28} /></button>
                                   <button onClick={async () => {
                                     if(!evolutionText.trim()) return;
                                     setLoading(true);
