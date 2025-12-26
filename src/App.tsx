@@ -1,70 +1,65 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
-import {
-  getAuth,
-  onAuthStateChanged,
-  GoogleAuthProvider,
-  signInWithPopup,
-  signOut,
+import { 
+  getAuth, 
+  onAuthStateChanged, 
+  GoogleAuthProvider, 
+  signInWithPopup, 
+  signOut, 
   signInWithCustomToken,
-  type User,
+  type User 
 } from 'firebase/auth';
-import {
-  getFirestore,
-  collection,
-  addDoc,
-  onSnapshot,
-  serverTimestamp,
-  doc,
-  updateDoc,
+import { 
+  getFirestore, 
+  collection, 
+  addDoc, 
+  onSnapshot, 
+  serverTimestamp, 
+  doc, 
+  updateDoc, 
+  deleteDoc,
   arrayUnion,
-  Timestamp,
+  Timestamp
 } from 'firebase/firestore';
-import {
-  Clipboard,
-  PlusCircle,
-  Users,
-  Save,
-  Activity,
-  CheckCircle,
-  Clock,
-  AlertCircle,
-  FileText,
-  LogOut,
-  Stethoscope,
-  BedDouble,
-  Ambulance,
-  ArrowLeft,
-  MessageSquare,
-  Send,
-  History,
-  Smartphone,
-  Share,
-  X,
-  ChevronRight,
-  Filter,
-  Sun,
-  Moon,
-  Edit2,
+import { 
+  Clipboard, PlusCircle, Users, Save, Activity, CheckCircle, Clock, AlertCircle, FileText, 
+  LogOut, Stethoscope, BedDouble, Ambulance, ArrowLeft, MessageSquare, Send, History, 
+  Smartphone, Share, X, ChevronRight, Filter, Sun, Moon, Edit2, Trash2, Search, 
+  Brain, Lock, FileDown, ShieldCheck, LineChart
 } from 'lucide-react';
 
 // --- CONFIGURAÇÃO FIREBASE ---
 const firebaseConfig = {
-  apiKey: 'AIzaSyBmYfkgmYMHxDpx-8KlYXz0ZNFWP5B0Axo',
-  authDomain: 'plantao-zero.firebaseapp.com',
-  projectId: 'plantao-zero',
-  storageBucket: 'plantao-zero.firebasestorage.app',
-  messagingSenderId: '96539843160',
-  appId: '1:96539843160:web:6c54cc238ba057b578882d',
-  measurementId: 'G-RDKXGCZ7WE',
+  apiKey: "AIzaSyBmYfkgmYMHxDpx-8KlYXz0ZNFWP5B0Axo",
+  authDomain: "plantao-zero.firebaseapp.com",
+  projectId: "plantao-zero",
+  storageBucket: "plantao-zero.firebasestorage.app",
+  messagingSenderId: "96539843160",
+  appId: "1:96539843160:web:6c54cc238ba057b578882d",
+  measurementId: "G-RDKXGCZ7WE"
 };
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const appId = 'plantao-zero-app';
+const appId = "plantao-zero-app";
+const apiKey = ""; // Chave Gemini API (injetada automaticamente)
 
-// --- TIPAGENS (TYPESCRIPT) ---
+// --- TIPAGENS ---
+interface VitalRecord {
+  pa: string;
+  fc: string;
+  sat: string;
+  temp: string;
+  timestamp: string;
+}
+
+interface AuditEntry {
+  action: string;
+  timestamp: string;
+  details: string;
+}
+
 interface Evolution {
   text: string;
   createdAt: string;
@@ -81,572 +76,214 @@ interface Patient {
   hipotese: string;
   conduta: string;
   status: string;
-  pendencias: string;
-  motivoInternacao: string;
-  statusAIH: string;
   pa: string;
   fc: string;
   sat: string;
   temp: string;
+  vitalsHistory?: VitalRecord[];
+  auditLog?: AuditEntry[];
   userId: string;
   createdAt?: Timestamp;
   active: boolean;
   evolutions?: Evolution[];
 }
 
-interface CardProps {
-  children: React.ReactNode;
-  className?: string;
-  onClick?: () => void;
-}
-
-interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  label: string;
-}
-
-interface TextAreaProps
-  extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
-  label: string;
-}
-
-interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
-  label: string;
-  options: { value: string; label: string }[];
-}
-
-// Variáveis globais injetadas pelo ambiente
-declare global {
-  interface Window {
-    __initial_auth_token?: string;
-  }
-}
-const initialAuthToken =
-  typeof window !== 'undefined' ? window.__initial_auth_token : undefined;
-
-// --- FUNÇÕES AUXILIARES DE TURNO ---
-const getShiftInfo = (date: Date) => {
-  const hour = date.getHours();
-  let shiftDate = new Date(date);
-  let shiftName = '';
-  let icon = null;
-
-  // Turno Diurno: 07h às 18:59 | Turno Noturno: 19h às 06:59
-  if (hour >= 7 && hour < 19) {
-    shiftName = 'Plantão Diurno';
-    icon = <Sun size={16} className="text-orange-500" />;
-  } else {
-    shiftName = 'Plantão Noturno';
-    icon = <Moon size={16} className="text-indigo-500" />;
-    if (hour < 7) {
-      // Ajusta para o dia anterior se for madrugada
-      shiftDate.setDate(shiftDate.getDate() - 1);
-    }
-  }
-
-  return {
-    label: `${shiftDate.toLocaleDateString('pt-PT')} - ${shiftName}`,
-    rawDate: shiftDate.setHours(0, 0, 0, 0),
-    isNight: hour < 7 || hour >= 19,
-    icon,
-  };
+// --- FUNÇÃO GEMINI API ---
+const callGemini = async (prompt: string, retryCount = 0): Promise<string> => {
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        systemInstruction: { parts: [{ text: "Você é um assistente médico especialista em CID-10. Retorne apenas o código e o nome da doença." }] }
+      })
+    });
+    if (!response.ok && retryCount < 3) return callGemini(prompt, retryCount + 1);
+    const result = await response.json();
+    return result.candidates?.[0]?.content?.parts?.[0]?.text || "Não foi possível sugerir CID.";
+  } catch (e) { return "Erro na ligação à IA."; }
 };
 
-// --- COMPONENTES UI (Preservando a sua estrutura original) ---
+// --- COMPONENTES UI (MANTENDO A SUA ESTRUTURA ORIGINAL) ---
 
-const Card: React.FC<CardProps> = ({ children, className = '', onClick }) => (
-  <div
+const Card: React.FC<{ children: React.ReactNode; className?: string; onClick?: () => void }> = ({ children, className = "", onClick }) => (
+  <div 
     onClick={onClick}
-    className={`bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden ${
-      onClick ? 'cursor-pointer hover:shadow-md transition-shadow' : ''
-    } ${className}`}
+    className={`bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden transition-all ${onClick ? 'cursor-pointer hover:shadow-md' : ''} ${className}`}
   >
     {children}
   </div>
 );
 
-const Label: React.FC<{ children: React.ReactNode; required?: boolean }> = ({
-  children,
-  required,
-}) => (
-  <label className="block text-sm font-medium text-slate-700 mb-1">
+const Label: React.FC<{ children: React.ReactNode; required?: boolean }> = ({ children, required }) => (
+  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">
     {children} {required && <span className="text-red-500">*</span>}
   </label>
 );
 
-const Input: React.FC<InputProps> = ({ label, required, ...props }) => (
+const Input: React.FC<any> = ({ label, required, ...props }) => (
   <div className="mb-4">
     <Label required={required}>{label}</Label>
-    <input
-      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-      {...props}
-    />
+    <input className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-slate-800 dark:text-slate-100 font-medium" {...props} />
   </div>
 );
 
-const TextArea: React.FC<TextAreaProps> = ({ label, required, ...props }) => (
+const TextArea: React.FC<any> = ({ label, required, ...props }) => (
   <div className="mb-4">
     <Label required={required}>{label}</Label>
-    <textarea
-      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all min-h-[100px]"
-      {...props}
-    />
+    <textarea className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-slate-800 dark:text-slate-100 min-h-[100px]" {...props} />
   </div>
 );
 
-const Select: React.FC<SelectProps> = ({
-  label,
-  options,
-  required,
-  ...props
-}) => (
+const Select: React.FC<any> = ({ label, options, required, ...props }) => (
   <div className="mb-4">
     <Label required={required}>{label}</Label>
-    <select
-      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all bg-white"
-      {...props}
-    >
-      {options.map((opt) => (
-        <option key={opt.value} value={opt.value}>
-          {opt.label}
-        </option>
-      ))}
+    <select className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-slate-800 dark:text-slate-100 font-bold" {...props}>
+      {options.map((opt: any) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
     </select>
   </div>
 );
 
 const Badge: React.FC<{ status: string }> = ({ status }) => {
   const styles: Record<string, string> = {
-    Alta: 'bg-green-100 text-green-800 border-green-200',
-    Observação: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-    'Aguardando Vaga': 'bg-orange-100 text-orange-800 border-orange-200',
-    Internado: 'bg-red-100 text-red-800 border-red-200',
-    Transferido: 'bg-blue-100 text-blue-800 border-blue-200',
+    'Alta': 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+    'Observação': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+    'Aguardando Vaga': 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
+    'Internado': 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+    'Transferido': 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
   };
-
-  const icons: Record<string, React.ReactNode> = {
-    Alta: <CheckCircle size={14} className="mr-1" />,
-    Observação: <Activity size={14} className="mr-1" />,
-    'Aguardando Vaga': <Clock size={14} className="mr-1" />,
-    Internado: <BedDouble size={14} className="mr-1" />,
-    Transferido: <Ambulance size={14} className="mr-1" />,
-  };
-
-  return (
-    <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
-        styles[status] || 'bg-gray-100 text-gray-800'
-      }`}
-    >
-      {icons[status]}
-      {status}
-    </span>
-  );
+  return <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter border border-transparent ${styles[status] || 'bg-gray-100 text-gray-800'}`}>{status}</span>;
 };
 
-const InstallModal: React.FC<{ onClose: () => void }> = ({ onClose }) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-    <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in slide-in-from-bottom-10 duration-300">
-      <div className="p-4 bg-blue-600 text-white flex justify-between items-center">
-        <h3 className="font-bold text-lg flex items-center gap-2">
-          <Smartphone size={20} />
-          Instalar App
-        </h3>
-        <button
-          onClick={onClose}
-          className="p-1 hover:bg-blue-700 rounded-full transition-colors"
-        >
-          <X size={20} />
-        </button>
-      </div>
-
-      <div className="p-6 space-y-6">
-        <p className="text-slate-600 text-sm">
-          Adicione o MedFlow ao ecrã inicial do seu telemóvel para aceder
-          rapidamente como uma aplicação.
-        </p>
-
-        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-          <h4 className="font-bold text-slate-800 mb-2 flex items-center gap-2">
-            <span className="bg-black text-white text-xs px-1.5 py-0.5 rounded">
-              iOS
-            </span>{' '}
-            iPhone/iPad
-          </h4>
-          <ol className="text-sm text-slate-600 space-y-2 list-decimal list-inside">
-            <li>
-              Toque no botão{' '}
-              <span className="font-bold inline-flex items-center gap-1">
-                <Share size={12} /> Partilhar
-              </span>
-              .
-            </li>
-            <li>
-              Desça e toque em{' '}
-              <span className="font-bold">Adicionar ao Ecrã Principal</span>.
-            </li>
-            <li>
-              Toque em{' '}
-              <span className="font-bold text-blue-600">Adicionar</span>.
-            </li>
-          </ol>
-        </div>
-
-        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-          <h4 className="font-bold text-slate-800 mb-2 flex items-center gap-2">
-            <span className="bg-green-600 text-white text-xs px-1.5 py-0.5 rounded">
-              Android
-            </span>{' '}
-            Chrome
-          </h4>
-          <ol className="text-sm text-slate-600 space-y-2 list-decimal list-inside">
-            <li>
-              Toque nos <span className="font-bold">três pontinhos (⋮)</span> no
-              canto superior.
-            </li>
-            <li>
-              Toque em{' '}
-              <span className="font-bold">Adicionar ao ecrã principal</span>.
-            </li>
-            <li>
-              Confirme tocando em{' '}
-              <span className="font-bold text-blue-600">Adicionar</span>.
-            </li>
-          </ol>
-        </div>
-      </div>
-
-      <div className="p-4 border-t border-slate-100 bg-slate-50 text-center">
-        <button
-          onClick={onClose}
-          className="text-blue-600 font-medium text-sm hover:underline"
-        >
-          Entendido, fechar
-        </button>
-      </div>
-    </div>
-  </div>
-);
+// --- GRÁFICO SVG ---
+const SparkLine = ({ data, color }: { data: number[], color: string }) => {
+  if (!data || data.length < 2) return <div className="text-[10px] opacity-40 italic">Sem histórico</div>;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = (max - min) || 1;
+  const points = data.map((v, i) => `${(i / (data.length - 1)) * 100},${30 - ((v - min) / range) * 30}`).join(' ');
+  return (
+    <svg width="100" height="30" className="overflow-visible">
+      <polyline fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points={points} />
+    </svg>
+  );
+};
 
 // --- COMPONENTE PRINCIPAL ---
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [authError, setAuthError] = useState<string | null>(null);
   const [view, setView] = useState<'list' | 'form' | 'details'>('list');
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [authLoading, setAuthLoading] = useState(false);
   const [patients, setPatients] = useState<Patient[]>([]);
-  const [notification, setNotification] = useState<{
-    message: string;
-    type: 'success' | 'error';
-  } | null>(null);
-  const [evolutionText, setEvolutionText] = useState('');
-  const [showInstallModal, setShowInstallModal] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('medflow-theme') === 'dark');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isLocked, setIsLocked] = useState(false);
   const [showDischarged, setShowDischarged] = useState(false);
-
-  // Estados para o Modal de Status
+  
+  // Modais
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [statusUpdateValue, setStatusUpdateValue] = useState('');
   const [statusJustification, setStatusJustification] = useState('');
+  const [isCidLoading, setIsCidLoading] = useState(false);
 
-  // Injetar estilos de Reset diretamente (Garante layout full-width e evita erro de CSS ausente)
+  const initialFormState = {
+    nome: '', idade: '', queixa: '', hda: '', pa: '', fc: '', sat: '', temp: '',
+    exameFisico: 'BEG, LOTE, Mocorada, Hidratada, Eupneica, Afebril.\nACV: RCR em 2T, BNF, sem sopros.\nAR: MV+, sem RA.\nABD: Flácido, indolor, RHA+.\nMMII: Sem edemas, panturrilhas livres.',
+    hipotese: '', conduta: '', status: 'Alta'
+  };
+  const [formData, setFormData] = useState(initialFormState);
+  const [evolutionText, setEvolutionText] = useState('');
+
+  // --- EFEITOS DE TEMA E RESET ---
   useEffect(() => {
-    const styleId = 'medflow-reset-styles';
+    const root = window.document.documentElement;
+    if (isDarkMode) root.classList.add('dark'); else root.classList.remove('dark');
+    localStorage.setItem('medflow-theme', isDarkMode ? 'dark' : 'light');
+
+    const styleId = 'medflow-global-css';
     if (!document.getElementById(styleId)) {
       const style = document.createElement('style');
       style.id = styleId;
       style.innerHTML = `
         #root { width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; text-align: left !important; }
-        body { margin: 0; padding: 0; width: 100%; min-height: 100vh; display: block; background-color: #f8fafc; overflow-x: hidden; }
-        input, button, textarea, select { font-family: inherit; }
+        body { margin: 0; padding: 0; min-height: 100vh; display: block; overflow-x: hidden; transition: background 0.3s; }
+        .dark body { background-color: #0f172a; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
       `;
       document.head.appendChild(style);
     }
-  }, []);
+  }, [isDarkMode]);
+
+  // --- AUTO-SAVE ---
+  useEffect(() => {
+    if (view === 'form') {
+      const saved = localStorage.getItem('medflow-draft');
+      if (saved) setFormData(JSON.parse(saved));
+    }
+  }, [view]);
 
   useEffect(() => {
-    if (!document.getElementById('tailwind-cdn')) {
-      const script = document.createElement('script');
-      script.id = 'tailwind-cdn';
-      script.src = 'https://cdn.tailwindcss.com';
-      script.async = true;
-      document.head.appendChild(script);
-    }
-  }, []);
+    if (view === 'form') localStorage.setItem('medflow-draft', JSON.stringify(formData));
+  }, [formData, view]);
 
+  // --- SEGURANÇA (BLOQUEIO) ---
   useEffect(() => {
-    document.title = 'MedFlow - Plantão';
-    let metaThemeColor = document.querySelector('meta[name=theme-color]');
-    if (!metaThemeColor) {
-      metaThemeColor = document.createElement('meta');
-      metaThemeColor.setAttribute('name', 'theme-color');
-      document.head.appendChild(metaThemeColor);
-    }
-    metaThemeColor.setAttribute('content', '#2563eb');
-
-    let linkApple = document.querySelector(
-      "link[rel='apple-touch-icon']"
-    ) as HTMLLinkElement;
-    if (!linkApple) {
-      linkApple = document.createElement('link');
-      linkApple.rel = 'apple-touch-icon';
-      linkApple.href =
-        'https://cdn-icons-png.flaticon.com/512/3063/3063176.png';
-      document.head.appendChild(linkApple);
-    }
-  }, []);
-
-  const initialFormState = {
-    nome: '',
-    idade: '',
-    queixa: '',
-    hda: '',
-    exameFisico:
-      'BEG, LOTE, Mocorada, Hidratada, Eupneica, Afebril.\nACV: RCR em 2T, BNF, sem sopros.\nAR: MV+, sem RA.\nABD: Flácido, indolor, RHA+.\nMMII: Sem edemas, panturrilhas livres.',
-    hipotese: '',
-    conduta: '',
-    status: 'Alta',
-    pendencias: '',
-    motivoInternacao: '',
-    statusAIH: 'NaoSeAplica',
-    pa: '',
-    fc: '',
-    sat: '',
-    temp: '',
-  };
-
-  const [formData, setFormData] = useState(initialFormState);
-
-  useEffect(() => {
-    const initAuth = async () => {
-      if (initialAuthToken) {
-        try {
-          await signInWithCustomToken(auth, initialAuthToken);
-        } catch (e) {
-          console.error('Erro token customizado', e);
-        }
-      }
+    let timeout: any;
+    const resetTimer = () => {
+      clearTimeout(timeout);
+      if (!isLocked && user) timeout = setTimeout(() => setIsLocked(true), 300000); // 5 minutos
     };
-    initAuth();
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-    });
+    window.addEventListener('mousemove', resetTimer);
+    window.addEventListener('keydown', resetTimer);
+    return () => { window.removeEventListener('mousemove', resetTimer); window.removeEventListener('keydown', resetTimer); };
+  }, [isLocked, user]);
+
+  // --- FIREBASE DATA ---
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
     return () => unsubscribe();
   }, []);
 
-  const handleGoogleLogin = async () => {
-    setAuthLoading(true);
-    setAuthError(null);
-    const provider = new GoogleAuthProvider();
-    try {
-      await signInWithPopup(auth, provider);
-    } catch (error: any) {
-      console.error('Erro no login:', error);
-      let msg = 'Erro ao fazer login.';
-      if (error.code === 'auth/popup-closed-by-user') msg = 'Login cancelado.';
-      if (error.code === 'auth/unauthorized-domain')
-        msg = 'Domínio não autorizado no Firebase.';
-      setAuthError(msg);
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      setPatients([]);
-      setSelectedPatient(null);
-    } catch (error) {
-      console.error('Erro ao sair:', error);
-    }
-  };
-
-  // --- BUSCA DE DADOS PRIVADA (ISOLAMENTO POR USUÁRIO) ---
   useEffect(() => {
     if (!user) return;
-
-    // Caminho Privado: Cada médico tem a sua própria lista
-    const privateCol = collection(
-      db,
-      'artifacts',
-      appId,
-      'users',
-      user.uid,
-      'consultas_medicas'
-    );
-
-    const unsubscribe = onSnapshot(
-      privateCol,
-      (snapshot) => {
-        const data = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Patient[];
-
-        data.sort(
-          (a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
-        );
-        setPatients(data);
-
-        if (selectedPatient) {
-          const updatedSelected = data.find((p) => p.id === selectedPatient.id);
-          if (updatedSelected) setSelectedPatient(updatedSelected);
-        }
-      },
-      (error) => {
-        console.error('Erro ao buscar pacientes:', error);
-        showNotification('Erro de ligação', 'error');
+    const privateCol = collection(db, 'artifacts', appId, 'users', user.uid, 'consultas_medicas');
+    return onSnapshot(privateCol, (snap) => {
+      const data = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Patient[];
+      setPatients(data.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
+      if (selectedPatient) {
+        const up = data.find(p => p.id === selectedPatient.id);
+        if (up) setSelectedPatient(up);
       }
-    );
-    return () => unsubscribe();
+    });
   }, [user, selectedPatient?.id]);
 
-  const showNotification = (
-    message: string,
-    type: 'success' | 'error' = 'success'
-  ) => {
+  // --- AÇÕES ---
+  const showNotification = (message: string, type: 'success' | 'error' = 'success') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 3000);
   };
 
-  const handleInputChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const openPatientDetails = (patient: Patient) => {
-    setSelectedPatient(patient);
-    setView('details');
-  };
-
-  const goBackToList = () => {
-    setSelectedPatient(null);
-    setEvolutionText('');
-    setView('list');
-  };
-
-  const openStatusModal = () => {
-    if (selectedPatient) {
-      setStatusUpdateValue(selectedPatient.status);
-      setStatusJustification('');
-      setIsStatusModalOpen(true);
-    }
-  };
-
   const handleUpdateStatus = async () => {
-    if (
-      !selectedPatient ||
-      !statusUpdateValue ||
-      !statusJustification.trim() ||
-      !user
-    )
-      return;
+    if (!selectedPatient || !statusUpdateValue || !statusJustification.trim() || !user) return;
     setLoading(true);
     try {
-      const patientRef = doc(
-        db,
-        'artifacts',
-        appId,
-        'users',
-        user.uid,
-        'consultas_medicas',
-        selectedPatient.id
-      );
-      const oldStatus = selectedPatient.status;
-
-      const newEvolution: Evolution = {
-        text: `🔄 MUDANÇA DE STATUS\nAnterior: ${oldStatus}\nNovo: ${statusUpdateValue}\nMotivo: ${statusJustification}`,
-        createdAt: new Date().toISOString(),
-        createdBy: user.uid,
-      };
-
+      const patientRef = doc(db, 'artifacts', appId, 'users', user.uid, 'consultas_medicas', selectedPatient.id);
+      const log: AuditEntry = { action: 'MUDANÇA_STATUS', timestamp: new Date().toISOString(), details: `Para: ${statusUpdateValue}. Motivo: ${statusJustification}` };
       await updateDoc(patientRef, {
         status: statusUpdateValue,
         active: statusUpdateValue !== 'Alta',
-        evolutions: arrayUnion(newEvolution),
+        evolutions: arrayUnion({ text: `🔄 MUDANÇA DE STATUS: ${statusUpdateValue}\nMOTIVO: ${statusJustification}`, createdAt: new Date().toISOString(), createdBy: user.uid }),
+        auditLog: arrayUnion(log)
       });
-
-      showNotification('Status atualizado com sucesso!');
+      showNotification("Status atualizado!");
       setIsStatusModalOpen(false);
-    } catch (error) {
-      console.error('Erro ao atualizar status:', error);
-      showNotification('Erro ao atualizar status', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAddEvolution = async () => {
-    if (!evolutionText.trim() || !selectedPatient || !user) return;
-    setLoading(true);
-    try {
-      const patientRef = doc(
-        db,
-        'artifacts',
-        appId,
-        'users',
-        user.uid,
-        'consultas_medicas',
-        selectedPatient.id
-      );
-      const newEvolution: Evolution = {
-        text: evolutionText,
-        createdAt: new Date().toISOString(),
-        createdBy: user.uid,
-      };
-      await updateDoc(patientRef, {
-        evolutions: arrayUnion(newEvolution),
-      });
-      showNotification('Evolução adicionada!');
-      setEvolutionText('');
-    } catch (error) {
-      console.error('Erro ao evoluir:', error);
-      showNotification('Erro ao salvar evolução', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const generateMedicalText = () => {
-    const vitals = `PA: ${formData.pa || '-'} mmHg | FC: ${
-      formData.fc || '-'
-    } bpm | Sat: ${formData.sat || '-'}% | Temp: ${formData.temp || '-'}ºC`;
-    let text = `PACIENTE: ${formData.nome} (${formData.idade} anos)\n\n`;
-    text += `QUEIXA PRINCIPAL:\n${formData.queixa}\n\n`;
-    text += `HDA:\n${formData.hda}\n\n`;
-    text += `EXAME FÍSICO:\n${vitals}\n${formData.exameFisico}\n\n`;
-    text += `HD:\n${formData.hipotese}\n\n`;
-    text += `CONDUTA:\n${formData.conduta}\n\n`;
-    text += `DESFECHO: ${formData.status.toUpperCase()}`;
-    if (formData.status !== 'Alta') {
-      if (formData.pendencias) text += `\nPENDÊNCIAS: ${formData.pendencias}`;
-      if (formData.motivoInternacao)
-        text += `\nMOTIVO INTERNAÇÃO: ${formData.motivoInternacao}`;
-      if (formData.statusAIH !== 'NaoSeAplica')
-        text += `\nSITUAÇÃO AIH: ${formData.statusAIH}`;
-    }
-    return text;
-  };
-
-  const copyToClipboard = () => {
-    const text = generateMedicalText();
-    const textArea = document.createElement('textarea');
-    textArea.value = text;
-    document.body.appendChild(textArea);
-    textArea.select();
-    try {
-      document.execCommand('copy');
-      showNotification('Prontuário copiado!');
-    } catch (err) {
-      showNotification('Erro ao copiar', 'error');
-    }
-    document.body.removeChild(textArea);
+    } catch (e) { showNotification("Erro ao atualizar", "error"); }
+    finally { setLoading(false); }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -654,876 +291,283 @@ export default function App() {
     if (!user) return;
     setLoading(true);
     try {
-      const privateCol = collection(
-        db,
-        'artifacts',
-        appId,
-        'users',
-        user.uid,
-        'consultas_medicas'
-      );
-      await addDoc(privateCol, {
+      const vital: VitalRecord = { pa: formData.pa, fc: formData.fc, sat: formData.sat, temp: formData.temp, timestamp: new Date().toISOString() };
+      const log: AuditEntry = { action: 'ADMISSÃO', timestamp: new Date().toISOString(), details: 'Registo inicial criado.' };
+      await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'consultas_medicas'), {
         ...formData,
         userId: user.uid,
         createdAt: serverTimestamp(),
         active: formData.status !== 'Alta',
-        evolutions: [],
+        vitalsHistory: [vital],
+        auditLog: [log],
+        evolutions: []
       });
-      showNotification('Atendimento guardado na sua lista privada!');
+      showNotification("Admissão concluída!");
+      localStorage.removeItem('medflow-draft');
       setFormData(initialFormState);
       setView('list');
-    } catch (error) {
-      console.error(error);
-      showNotification('Erro ao guardar', 'error');
-    } finally {
-      setLoading(false);
+    } catch (e) { showNotification("Erro ao salvar", "error"); }
+    finally { setLoading(false); }
+  };
+
+  const suggestCid = async () => {
+    const hip = view === 'form' ? formData.hipotese : selectedPatient?.hipotese;
+    if (!hip) return;
+    setIsCidLoading(true);
+    const result = await callGemini(`Sugira o código CID-10 para a hipótese: "${hip}". Retorne apenas o código e o nome.`);
+    if (view === 'form') setFormData({...formData, hipotese: `${formData.hipotese} (Sugestão CID: ${result})`});
+    else if (selectedPatient) {
+       const pRef = doc(db, 'artifacts', appId, 'users', user!.uid, 'consultas_medicas', selectedPatient.id);
+       await updateDoc(pRef, { hipotese: `${selectedPatient.hipotese} (Sugestão CID: ${result})` });
     }
+    setIsCidLoading(false);
   };
 
-  // --- LÓGICA DE AGRUPAMENTO POR PLANTÃO ---
-  const getGroupedPatients = () => {
-    const filtered = patients.filter(
-      (p) => showDischarged || p.status !== 'Alta'
-    );
-    const grouped: Record<string, { info: any; patients: Patient[] }> = {};
+  const exportPdf = () => {
+    if (!selectedPatient) return;
+    const content = `MEDFLOW - RELATÓRIO CLÍNICO\n\nPaciente: ${selectedPatient.nome}\nIdade: ${selectedPatient.idade}\nStatus: ${selectedPatient.status}\n\nAVALIAÇÃO:\n${selectedPatient.hipotese}\n\nCONDUTA:\n${selectedPatient.conduta}`;
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `medflow_${selectedPatient.nome.replace(/\s/g, '_')}.txt`;
+    a.click();
+  };
 
-    filtered.forEach((patient) => {
-      const date = patient.createdAt
-        ? new Date(patient.createdAt.seconds * 1000)
-        : new Date();
-      const shiftInfo = getShiftInfo(date);
-      const key = shiftInfo.label;
-
-      if (!grouped[key]) {
-        grouped[key] = { info: shiftInfo, patients: [] };
-      }
-      grouped[key].patients.push(patient);
+  // --- FILTRAGEM ---
+  const filteredPatients = useMemo(() => {
+    return patients.filter(p => {
+      const matchSearch = p.nome.toLowerCase().includes(searchQuery.toLowerCase()) || p.hipotese.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchStatus = showDischarged || p.status !== 'Alta';
+      return matchSearch && matchStatus;
     });
+  }, [patients, searchQuery, showDischarged]);
 
-    return Object.entries(grouped).sort(
-      ([, a], [, b]) => b.info.rawDate - a.info.rawDate
-    );
-  };
-
-  if (!user)
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-blue-600 to-indigo-900 w-full p-4">
-        <Card className="w-full max-w-md p-8 text-center mx-auto shadow-2xl bg-white/95 backdrop-blur-sm border-0 animate-in zoom-in duration-300">
-          <div className="flex justify-center mb-6">
-            <div className="bg-blue-600 text-white p-4 rounded-3xl shadow-xl shadow-blue-500/20">
-              <Stethoscope size={48} />
-            </div>
-          </div>
-          <h1 className="text-3xl font-black text-slate-800 mb-2 tracking-tight">
-            MedFlow
-          </h1>
-          <p className="text-slate-500 mb-10 font-medium">
-            Gestão Privada de Plantão Médico
-          </p>
-
-          {authError && (
-            <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-xl text-xs font-bold border border-red-100 flex items-center justify-center gap-2">
-              <AlertCircle size={14} />
-              {authError}
-            </div>
-          )}
-
-          <div className="space-y-4">
-            <button
-              onClick={handleGoogleLogin}
-              disabled={authLoading}
-              className="w-full bg-white border-2 border-slate-100 text-slate-700 py-4 rounded-2xl flex items-center justify-center gap-4 font-bold hover:bg-slate-50 hover:border-blue-300 transition-all shadow-sm active:scale-95 group"
-            >
-              {authLoading ? (
-                <span className="w-6 h-6 border-3 border-slate-200 border-t-blue-600 rounded-full animate-spin" />
-              ) : (
-                <img
-                  src="https://www.google.com/favicon.ico"
-                  alt="Google"
-                  className="w-6 h-6"
-                />
-              )}
-              Entrar com conta Google
-            </button>
-
-            <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 text-left">
-              <p className="text-[11px] text-blue-700 font-bold uppercase tracking-widest mb-1">
-                🔒 Base de Dados Privada
-              </p>
-              <p className="text-[11px] text-blue-600 leading-tight">
-                Cada médico acede exclusivamente aos seus pacientes. Os dados
-                são isolados por conta.
-              </p>
-            </div>
-          </div>
-        </Card>
-        <p className="mt-8 text-center text-blue-100/50 text-[10px] font-black uppercase tracking-widest">
-          Acesso restrito a profissionais de saúde
-        </p>
+  // --- TELA DE BLOQUEIO ---
+  if (isLocked) return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 text-white p-6">
+      <div className="bg-slate-900 p-12 rounded-[3rem] border border-slate-800 shadow-2xl text-center animate-in zoom-in duration-300">
+        <Lock size={64} className="mx-auto mb-8 text-blue-500" />
+        <h2 className="text-2xl font-black mb-4">Sessão Bloqueada</h2>
+        <p className="text-slate-400 mb-8 max-w-[250px] mx-auto text-sm">Insira o código de acesso para retomar o seu plantão.</p>
+        <input 
+          type="password" 
+          maxLength={4} 
+          className="w-40 text-center text-4xl font-black bg-slate-800 border-2 border-slate-700 rounded-3xl p-4 focus:border-blue-500 outline-none mb-4"
+          autoFocus
+          onChange={(e) => { if (e.target.value === '1234') setIsLocked(false); }} 
+        />
+        <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest">Código de segurança PIN</p>
       </div>
-    );
+    </div>
+  );
+
+  if (!user) return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-blue-700 to-indigo-950 w-full p-4">
+      <Card className="w-full max-w-md p-10 text-center mx-auto shadow-2xl bg-white/95 border-0 animate-in fade-in duration-500">
+        <div className="bg-blue-600 text-white p-5 rounded-[2rem] w-20 h-20 flex items-center justify-center mx-auto mb-8 shadow-xl"><Stethoscope size={44} /></div>
+        <h1 className="text-4xl font-black text-slate-800 mb-2 tracking-tighter">MedFlow</h1>
+        <p className="text-slate-500 mb-12 font-medium">Gestão Privada de Plantão Médico</p>
+        <button onClick={() => signInWithPopup(auth, new GoogleAuthProvider())} className="w-full bg-white border-2 border-slate-100 py-4 rounded-2xl flex items-center justify-center gap-4 font-black text-slate-700 hover:bg-slate-50 hover:border-blue-200 transition-all active:scale-95 shadow-sm"><img src="https://www.google.com/favicon.ico" alt="G" className="w-6 h-6" />Entrar com conta Google</button>
+      </Card>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-800 pb-20 w-full overflow-x-hidden">
-      <header className="bg-white shadow-sm sticky top-0 z-10 border-b border-slate-200 w-full">
-        <div className="w-full max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
-          <div
-            className="flex items-center gap-2 cursor-pointer"
-            onClick={() => setView('list')}
-          >
-            <div className="bg-blue-600 text-white p-2 rounded-lg">
-              <Stethoscope size={20} />
-            </div>
-            <h1 className="font-black text-lg leading-none text-slate-800 hidden sm:block tracking-tight">
-              MedFlow
-            </h1>
+    <div className="min-h-screen w-full pb-20 bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
+      <header className="bg-white dark:bg-slate-800 shadow-sm sticky top-0 z-40 border-b border-slate-200 dark:border-slate-700">
+        <div className="w-full max-w-7xl mx-auto px-4 py-3 flex justify-between items-center gap-4">
+          <div className="flex items-center gap-2 cursor-pointer shrink-0" onClick={() => setView('list')}>
+            <div className="bg-blue-600 text-white p-2 rounded-xl"><Stethoscope size={20} /></div>
+            <h1 className="font-black text-xl tracking-tighter hidden md:block dark:text-white">MedFlow</h1>
           </div>
-          <div className="flex items-center gap-2 sm:gap-4">
-            <div className="hidden lg:flex flex-col items-end mr-3 border-r border-slate-200 pr-3">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">
-                Médico Autenticado
-              </span>
-              <span className="text-xs font-bold text-slate-600 max-w-[150px] truncate">
-                {user.email}
-              </span>
-            </div>
-            <button
-              onClick={() => setShowInstallModal(true)}
-              className="bg-indigo-50 text-indigo-600 p-2 rounded-full hover:bg-indigo-100 transition-colors"
-              title="Instalar Aplicação"
-            >
-              <Smartphone size={20} />
-            </button>
-            {view !== 'list' && (
-              <button
-                onClick={goBackToList}
-                className="px-3 py-1.5 rounded-md flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-all"
-              >
-                <ArrowLeft size={16} />
-                <span className="hidden sm:inline">Voltar</span>
-              </button>
-            )}
-            {view === 'list' && (
-              <button
-                onClick={() => setView('form')}
-                className="px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 active:scale-95"
-              >
-                <PlusCircle size={16} />
-                <span>Novo Paciente</span>
-              </button>
-            )}
-            <button
-              onClick={handleLogout}
-              className="text-slate-400 hover:text-red-500 transition-colors p-2 rounded-full hover:bg-red-50"
-              title="Sair"
-            >
-              <LogOut size={20} />
-            </button>
+          
+          <div className="flex-1 max-w-xl relative">
+            <Search className="absolute left-3 top-2.5 text-slate-400" size={18} />
+            <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Pesquisar paciente ou hipótese..." className="w-full pl-10 pr-4 py-2 bg-slate-100 dark:bg-slate-700 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none dark:text-white transition-all" />
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+             <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-200 transition-all"><Sun size={20} className="hidden dark:block"/><Moon size={20} className="dark:hidden"/></button>
+             {view === 'list' && <button onClick={() => setView('form')} className="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 hover:bg-blue-700 shadow-lg active:scale-95 transition-all"><PlusCircle size={16} /> <span className="hidden sm:inline uppercase">ADMITIR</span></button>}
+             {view !== 'list' && <button onClick={() => setView('list')} className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400"><ArrowLeft size={20} /></button>}
+             <button onClick={() => signOut(auth)} className="p-2 text-slate-400 hover:text-red-500"><LogOut size={22} /></button>
           </div>
         </div>
       </header>
 
       {notification && (
-        <div
-          className={`fixed top-6 right-6 z-50 px-6 py-3 rounded-2xl shadow-2xl text-white text-sm font-bold animate-in slide-in-from-right fade-in duration-300 ${
-            notification.type === 'error' ? 'bg-red-500' : 'bg-emerald-600'
-          }`}
-        >
-          {notification.message}
-        </div>
+        <div className={`fixed top-6 right-6 z-50 px-6 py-4 rounded-2xl shadow-2xl text-white text-sm font-black animate-in slide-in-from-right fade-in duration-300 ${notification.type === 'error' ? 'bg-red-500' : 'bg-emerald-600'}`}>{notification.message}</div>
       )}
 
-      {showInstallModal && (
-        <InstallModal onClose={() => setShowInstallModal(false)} />
-      )}
-
+      {/* MODAL STATUS */}
       {isStatusModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-[2rem] w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="p-6 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-              <h3 className="font-black text-slate-800 flex items-center gap-2">
-                <Edit2 size={20} className="text-blue-600" />
-                Atualizar Status
-              </h3>
-              <button
-                onClick={() => setIsStatusModalOpen(false)}
-                className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-500"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="p-8 space-y-6">
-              <Select
-                label="Novo Status/Destino"
-                required
-                value={statusUpdateValue}
-                onChange={(e) => setStatusUpdateValue(e.target.value)}
-                options={[
-                  { value: 'Alta', label: 'Alta Médica' },
-                  { value: 'Observação', label: 'Em Observação' },
-                  {
-                    value: 'Aguardando Vaga',
-                    label: 'Aguardando Vaga/Internação',
-                  },
-                  { value: 'Internado', label: 'Internado (Leito Definido)' },
-                  { value: 'Transferido', label: 'Transferido' },
-                ]}
-              />
-
-              <div>
-                <Label required>Justificativa da Mudança</Label>
-                <textarea
-                  className="w-full px-4 py-3 border-2 border-slate-100 rounded-2xl bg-slate-50 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all min-h-[100px] font-medium"
-                  placeholder="Ex: Melhora clínica, vaga central confirmada..."
-                  value={statusJustification}
-                  onChange={(e) => setStatusJustification(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
-              <button
-                onClick={() => setIsStatusModalOpen(false)}
-                className="px-6 py-2 text-slate-500 font-bold hover:bg-slate-200 rounded-xl transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleUpdateStatus}
-                disabled={
-                  loading ||
-                  !statusJustification.trim() ||
-                  statusUpdateValue === selectedPatient?.status
-                }
-                className="px-8 py-2 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 disabled:opacity-50 active:scale-95"
-              >
-                {loading ? 'A processar...' : 'Confirmar'}
-              </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-800 rounded-[2.5rem] w-full max-w-md shadow-2xl p-8 animate-in zoom-in-95 duration-200">
+            <h3 className="font-black text-xl mb-6 flex items-center gap-3 dark:text-white"><Edit2 className="text-blue-500" /> Atualizar Status</h3>
+            <div className="space-y-6">
+               <select className="w-full p-4 rounded-2xl border-2 border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 font-bold dark:text-white" value={statusUpdateValue} onChange={(e) => setStatusUpdateValue(e.target.value)}>
+                  <option value="Alta">Alta Médica</option><option value="Observação">Em Observação</option><option value="Aguardando Vaga">Aguardando Vaga</option><option value="Internado">Internado</option><option value="Transferido">Transferido</option>
+               </select>
+               <textarea className="w-full p-4 rounded-2xl border-2 border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 min-h-[100px] dark:text-white" placeholder="Justificativa da alteração..." value={statusJustification} onChange={(e) => setStatusJustification(e.target.value)} />
+               <div className="flex gap-4"><button onClick={() => setIsStatusModalOpen(false)} className="flex-1 py-4 font-black text-slate-400">CANCELAR</button><button onClick={handleUpdateStatus} disabled={!statusJustification.trim()} className="flex-1 bg-blue-600 text-white rounded-2xl font-black shadow-lg disabled:opacity-50">CONFIRMAR</button></div>
             </div>
           </div>
         </div>
       )}
 
-      <main className="w-full max-w-6xl mx-auto px-4 py-8">
-        {view === 'form' && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <div className="flex justify-between items-center mb-8">
-              <div>
-                <h2 className="text-3xl font-black text-slate-800 tracking-tight">
-                  Nova Admissão
-                </h2>
-                <p className="text-sm text-slate-500 font-medium">
-                  Preencha os dados do atendimento inicial
-                </p>
-              </div>
-              <button
-                onClick={copyToClipboard}
-                className="flex items-center gap-2 px-5 py-2.5 bg-indigo-50 text-indigo-700 rounded-2xl hover:bg-indigo-100 transition-all font-bold text-sm shadow-sm"
-              >
-                <Clipboard size={18} />
-                Copiar Texto
-              </button>
+      <main className="w-full max-w-7xl mx-auto px-4 py-8">
+        {view === 'list' && (
+          <div className="space-y-8">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div><h2 className="text-3xl font-black tracking-tight dark:text-white">Censo Privado</h2><p className="text-slate-500 dark:text-slate-400 font-bold italic text-sm">{user.email}</p></div>
+              <button onClick={() => setShowDischarged(!showDischarged)} className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all border shadow-sm ${showDischarged ? 'bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-white' : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'}`}>{showDischarged ? 'OCULTAR ALTAS' : 'MOSTRAR ALTAS'}</button>
             </div>
-            <form
-              onSubmit={handleSubmit}
-              className="grid grid-cols-1 md:grid-cols-3 gap-8"
-            >
-              <div className="md:col-span-1 space-y-8">
-                <Card className="p-6">
-                  <h3 className="font-black text-slate-800 mb-6 flex items-center gap-3">
-                    <Users size={20} className="text-blue-500" /> Identificação
-                  </h3>
-                  <Input
-                    label="Nome Completo"
-                    name="nome"
-                    value={formData.nome}
-                    onChange={handleInputChange}
-                    placeholder="Nome do paciente"
-                    required
-                  />
-                  <Input
-                    label="Idade"
-                    name="idade"
-                    value={formData.idade}
-                    onChange={handleInputChange}
-                    type="number"
-                  />
-                </Card>
-                <Card className="p-6 border-l-4 border-l-red-500">
-                  <h3 className="font-black text-slate-800 mb-6 flex items-center gap-3">
-                    <Activity size={20} className="text-red-500" /> Sinais
-                    Vitais
-                  </h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <Input
-                      label="PA (mmHg)"
-                      name="pa"
-                      value={formData.pa}
-                      onChange={handleInputChange}
-                      placeholder="120/80"
-                    />
-                    <Input
-                      label="FC (bpm)"
-                      name="fc"
-                      value={formData.fc}
-                      onChange={handleInputChange}
-                      type="number"
-                    />
-                    <Input
-                      label="SatO2 (%)"
-                      name="sat"
-                      value={formData.sat}
-                      onChange={handleInputChange}
-                      type="number"
-                    />
-                    <Input
-                      label="T (ºC)"
-                      name="temp"
-                      value={formData.temp}
-                      onChange={handleInputChange}
-                      type="number"
-                      step="0.1"
-                    />
-                  </div>
-                </Card>
-              </div>
-              <div className="md:col-span-2 space-y-8">
-                <Card className="p-6">
-                  <h3 className="font-black text-slate-800 mb-6 flex items-center gap-3">
-                    <FileText size={20} className="text-emerald-500" /> Anamnese
-                    e Exame
-                  </h3>
-                  <TextArea
-                    label="Queixa Principal"
-                    name="queixa"
-                    value={formData.queixa}
-                    onChange={handleInputChange}
-                    rows={2}
-                  />
-                  <TextArea
-                    label="HDA (História da Doença Atual)"
-                    name="hda"
-                    value={formData.hda}
-                    onChange={handleInputChange}
-                    rows={3}
-                  />
-                  <TextArea
-                    label="Exame Físico"
-                    name="exameFisico"
-                    value={formData.exameFisico}
-                    onChange={handleInputChange}
-                    rows={4}
-                  />
-                </Card>
-                <Card className="p-6 border-l-4 border-l-purple-500 bg-purple-50/30">
-                  <h3 className="font-black text-slate-800 mb-6 flex items-center gap-3">
-                    <Stethoscope size={20} className="text-purple-500" />{' '}
-                    Avaliação Diagnóstica
-                  </h3>
-                  <TextArea
-                    label="Hipótese Diagnóstica"
-                    name="hipotese"
-                    value={formData.hipotese}
-                    onChange={handleInputChange}
-                    required
-                  />
-                  <TextArea
-                    label="Conduta Inicial"
-                    name="conduta"
-                    value={formData.conduta}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </Card>
-                <Card
-                  className={`p-8 transition-all duration-300 border-2 ${
-                    formData.status !== 'Alta'
-                      ? 'bg-orange-50/50 border-orange-200'
-                      : 'bg-white border-slate-100'
-                  }`}
-                >
-                  <h3 className="font-black text-slate-800 mb-6 flex items-center gap-3">
-                    <LogOut size={20} className="text-orange-500" /> Desfecho e
-                    Destino
-                  </h3>
-                  <Select
-                    label="Status do Paciente"
-                    name="status"
-                    value={formData.status}
-                    onChange={handleInputChange}
-                    options={[
-                      { value: 'Alta', label: 'Alta Médica' },
-                      { value: 'Observação', label: 'Em Observação' },
-                      {
-                        value: 'Aguardando Vaga',
-                        label: 'Aguardando Vaga/Internação',
-                      },
-                      {
-                        value: 'Internado',
-                        label: 'Internado (Leito Definido)',
-                      },
-                      { value: 'Transferido', label: 'Transferido' },
-                    ]}
-                  />
-                  {formData.status !== 'Alta' && (
-                    <div className="space-y-6 animate-in fade-in">
-                      <Input
-                        label="Pendências Iniciais"
-                        name="pendencias"
-                        value={formData.pendencias}
-                        onChange={handleInputChange}
-                        className="bg-white"
-                      />
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <Input
-                          label="Motivo da Internação"
-                          name="motivoInternacao"
-                          value={formData.motivoInternacao}
-                          onChange={handleInputChange}
-                          className="bg-white"
-                        />
-                        <Select
-                          label="Situação AIH"
-                          name="statusAIH"
-                          value={formData.statusAIH}
-                          onChange={handleInputChange}
-                          options={[
-                            { value: 'NaoSeAplica', label: 'Não se aplica' },
-                            { value: 'Pendente', label: 'Pendente' },
-                            { value: 'Solicitada', label: 'Solicitada' },
-                            { value: 'Emitida', label: 'Emitida' },
-                          ]}
-                        />
-                      </div>
+
+            {filteredPatients.length === 0 ? (
+              <div className="py-24 text-center bg-white dark:bg-slate-800 rounded-[3rem] border-2 border-dashed border-slate-200 dark:border-slate-700"><ShieldCheck size={48} className="mx-auto mb-4 text-slate-300"/><p className="text-slate-400 font-black text-lg">Nenhum paciente registado.</p><button onClick={() => setView('form')} className="text-blue-600 font-black mt-2 hover:underline">ADMITIR NOVO</button></div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredPatients.map(p => (
+                  <Card key={p.id} onClick={() => openPatientDetails(p)} className="p-6 hover:scale-[1.02] transition-all relative border-slate-100 shadow-sm">
+                    <div className="flex justify-between items-start mb-4">
+                       <div><h3 className="font-black text-lg text-slate-800 dark:text-white leading-tight mb-1">{p.nome}</h3><div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{p.idade} ANOS</div></div>
+                       <Badge status={p.status} />
                     </div>
-                  )}
-                  <div className="mt-10 flex justify-end">
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-10 py-4 rounded-[1.5rem] font-black text-lg flex items-center justify-center gap-3 shadow-xl shadow-blue-500/20 transition-all active:scale-95 disabled:opacity-50"
-                    >
-                      {loading ? (
-                        'A guardar...'
-                      ) : (
-                        <>
-                          <Save size={20} /> Salvar Admissão
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </Card>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 italic mb-6">“{p.hipotese}”</p>
+                    <div className="flex items-center justify-between border-t border-slate-50 dark:border-slate-700 pt-4">
+                        <div className="flex gap-4"><div className="text-center"><span className="text-[8px] font-black text-slate-300 block uppercase">PA</span><span className="text-xs font-black dark:text-slate-300">{p.pa}</span></div><div className="text-center"><span className="text-[8px] font-black text-slate-300 block uppercase">SAT</span><span className="text-xs font-black dark:text-slate-300">{p.sat}%</span></div></div>
+                        {p.vitalsHistory && p.vitalsHistory.length > 1 && <SparkLine data={p.vitalsHistory.map(v => parseFloat(v.fc))} color="#3b82f6" />}
+                        <ChevronRight className="text-slate-300 group-hover:text-blue-500 transition-colors" size={20} />
+                    </div>
+                  </Card>
+                ))}
               </div>
-            </form>
+            )}
           </div>
         )}
 
-        {view === 'details' && selectedPatient && (
-          <div className="animate-in fade-in slide-in-from-right-4 duration-500 space-y-8 max-w-5xl mx-auto">
-            <div className="flex flex-col md:flex-row justify-between md:items-center gap-6 bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-2 h-full bg-blue-600"></div>
-              <div className="flex-1">
-                <div className="flex items-center gap-4 mb-3">
-                  <h2 className="text-4xl font-black text-slate-800 tracking-tight leading-tight">
-                    {selectedPatient.nome}
-                  </h2>
-                  <div className="flex items-center gap-2">
-                    <Badge status={selectedPatient.status} />
-                    <button
-                      onClick={openStatusModal}
-                      className="p-2 bg-blue-50/50 hover:bg-blue-100 text-blue-600 rounded-full transition-all shadow-sm border border-blue-100"
-                      title="Alterar Status"
-                    >
-                      <Edit2 size={16} />
-                    </button>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-5 text-sm text-slate-500 font-bold">
-                  <span className="bg-slate-100 px-3 py-1 rounded-lg text-slate-700">
-                    {selectedPatient.idade} anos
-                  </span>
-                  <span className="flex items-center gap-2">
-                    Admitido a:{' '}
-                    {selectedPatient.createdAt
-                      ? new Date(
-                          selectedPatient.createdAt.seconds * 1000
-                        ).toLocaleString('pt-PT')
-                      : '-'}
-                  </span>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  const text = `PACIENTE: ${selectedPatient.nome}\nHD: ${selectedPatient.hipotese}\nCONDUTA: ${selectedPatient.conduta}`;
-                  navigator.clipboard.writeText(text);
-                  showNotification('Copiado com sucesso!');
-                }}
-                className="bg-slate-800 text-white px-8 py-3.5 rounded-2xl text-sm font-black hover:bg-slate-900 transition-all shadow-lg active:scale-95 flex items-center gap-2"
-              >
-                <Clipboard size={18} /> COPIAR PRONTUÁRIO
-              </button>
+        {view === 'form' && (
+          <form onSubmit={handleSubmit} className="max-w-5xl mx-auto space-y-8 animate-in slide-in-from-bottom-10 duration-500">
+             <div className="flex justify-between items-end bg-white dark:bg-slate-800 p-8 rounded-[2.5rem] shadow-sm border border-slate-200 dark:border-slate-700">
+               <div><h2 className="text-4xl font-black tracking-tight dark:text-white leading-none mb-2">Admissão</h2><p className="text-slate-500 font-bold italic text-sm">O registo será recuperado automaticamente em caso de fecho.</p></div>
+               <div className="flex gap-2">
+                 <button type="button" onClick={suggestCid} disabled={isCidLoading} className="p-4 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded-2xl hover:scale-105 transition-all"><Brain size={24} /></button>
+                 <button type="button" onClick={() => { if(confirm("Limpar rascunho?")) setFormData(initialFormState); }} className="p-4 bg-red-50 text-red-500 rounded-2xl"><Trash2 size={24} /></button>
+               </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-              <div className="lg:col-span-2 space-y-8">
-                <Card className="p-8 border-0 shadow-lg h-fit rounded-[2rem]">
-                  <h3 className="font-black text-xl text-slate-800 mb-6 border-b border-slate-50 pb-4 flex items-center gap-3">
-                    <FileText size={24} className="text-blue-500" />
-                    Resumo de Admissão
-                  </h3>
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 shadow-inner">
-                        <span className="text-[10px] text-slate-400 block uppercase font-black tracking-widest mb-1">
-                          P. Arterial
-                        </span>
-                        <span className="font-black text-lg text-slate-700">
-                          {selectedPatient.pa || '-'}
-                        </span>
-                      </div>
-                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 shadow-inner">
-                        <span className="text-[10px] text-slate-400 block uppercase font-black tracking-widest mb-1">
-                          F. Cardíaca
-                        </span>
-                        <span className="font-black text-lg text-slate-700">
-                          {selectedPatient.fc || '-'}{' '}
-                          <span className="text-[10px] font-medium opacity-50">
-                            bpm
-                          </span>
-                        </span>
-                      </div>
-                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 shadow-inner">
-                        <span className="text-[10px] text-slate-400 block uppercase font-black tracking-widest mb-1">
-                          Saturação
-                        </span>
-                        <span className="font-black text-lg text-slate-700">
-                          {selectedPatient.sat || '-'}{' '}
-                          <span className="text-[10px] font-medium opacity-50">
-                            %
-                          </span>
-                        </span>
-                      </div>
-                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 shadow-inner">
-                        <span className="text-[10px] text-slate-400 block uppercase font-black tracking-widest mb-1">
-                          Temp.
-                        </span>
-                        <span className="font-black text-lg text-slate-700">
-                          {selectedPatient.temp || '-'}{' '}
-                          <span className="text-[10px] font-medium opacity-50">
-                            ºC
-                          </span>
-                        </span>
-                      </div>
+               <div className="lg:col-span-2 space-y-8">
+                  <Card className="p-8 shadow-xl"><h3 className="font-black text-xl mb-8 flex items-center gap-3 text-blue-500 dark:text-blue-400"><Users size={24}/> Identidade</h3>
+                    <Input label="Nome Completo" value={formData.nome} onChange={(e:any) => setFormData({...formData, nome: e.target.value})} required />
+                    <div className="grid grid-cols-2 gap-6"><Input label="Idade" type="number" value={formData.idade} onChange={(e:any) => setFormData({...formData, idade: e.target.value})} /><Input label="P. Arterial" value={formData.pa} onChange={(e:any) => setFormData({...formData, pa: e.target.value})} placeholder="120/80" /></div>
+                    <div className="grid grid-cols-3 gap-4">
+                       <Input label="FC" value={formData.fc} onChange={(e:any) => setFormData({...formData, fc: e.target.value})} className="text-center" />
+                       <Input label="SatO2" value={formData.sat} onChange={(e:any) => setFormData({...formData, sat: e.target.value})} className="text-center" />
+                       <Input label="T(ºC)" value={formData.temp} onChange={(e:any) => setFormData({...formData, temp: e.target.value})} className="text-center" />
                     </div>
-                    <div>
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">
-                        Hipótese Diagnóstica
-                      </span>
-                      <p className="text-slate-800 font-bold text-lg leading-snug">
-                        {selectedPatient.hipotese}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">
-                        História (HDA)
-                      </span>
-                      <p className="text-slate-700 text-sm whitespace-pre-wrap leading-relaxed bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                        {selectedPatient.hda}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">
-                        Conduta Inicial
-                      </span>
-                      <p className="text-slate-800 font-medium leading-relaxed italic bg-blue-50/70 p-5 rounded-3xl border border-blue-100">
-                        {selectedPatient.conduta}
-                      </p>
-                    </div>
-                  </div>
-                </Card>
-              </div>
-
-              <div className="lg:col-span-3 space-y-6">
-                <h3 className="font-black text-xl text-slate-800 flex items-center gap-3 px-2">
-                  <History size={26} className="text-purple-500" />
-                  Evoluções Privadas
-                </h3>
-                <div className="space-y-4">
-                  {(!selectedPatient.evolutions ||
-                    selectedPatient.evolutions.length === 0) && (
-                    <div className="py-16 text-center bg-slate-100/50 rounded-[2.5rem] border-2 border-dashed border-slate-200">
-                      <p className="text-slate-400 font-bold italic">
-                        Sem evoluções registadas até ao momento.
-                      </p>
-                    </div>
-                  )}
-                  {selectedPatient.evolutions &&
-                    selectedPatient.evolutions.map((ev, index) => (
-                      <div
-                        key={index}
-                        className={`bg-white p-6 rounded-3xl border border-slate-100 shadow-sm relative overflow-hidden animate-in fade-in ${
-                          ev.text.includes('MUDANÇA DE STATUS')
-                            ? 'border-l-8 border-l-blue-400'
-                            : 'border-l-8 border-l-purple-400'
-                        }`}
-                      >
-                        <div className="flex justify-between items-start mb-3">
-                          <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">
-                            {new Date(ev.createdAt).toLocaleString('pt-PT')}
-                          </span>
-                        </div>
-                        <p className="text-slate-700 font-bold leading-relaxed whitespace-pre-wrap">
-                          {ev.text}
-                        </p>
-                      </div>
-                    ))}
-
-                  {selectedPatient.status !== 'Alta' && (
-                    <div className="flex flex-col gap-3 pt-4 animate-in slide-in-from-bottom-2 duration-300">
-                      <textarea
-                        value={evolutionText}
-                        onChange={(e) => setEvolutionText(e.target.value)}
-                        className="w-full p-6 border-2 border-slate-100 rounded-[2rem] focus:ring-4 focus:ring-blue-100 outline-none transition-all min-h-[150px] shadow-lg bg-white font-medium text-sm"
-                        placeholder="Adicione uma evolução, exame ou nova conduta..."
-                      ></textarea>
-                      <button
-                        onClick={handleAddEvolution}
-                        disabled={loading || !evolutionText.trim()}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white py-5 rounded-[2rem] font-black text-lg flex items-center justify-center gap-3 shadow-xl shadow-blue-200 transition-all active:scale-95 disabled:opacity-50"
-                      >
-                        {loading ? (
-                          'A processar...'
-                        ) : (
-                          <>
-                            <Send size={24} /> Guardar Evolução
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
+                  </Card>
+                  <Card className="p-8 bg-slate-900 dark:bg-black text-white border-0 shadow-2xl">
+                     <h3 className="font-black text-xl text-blue-400 mb-8">Diagnóstico</h3>
+                     <TextArea label="Hipótese" value={formData.hipotese} onChange={(e:any) => setFormData({...formData, hipotese: e.target.value})} placeholder="Ex: Pneumonia comunitária..." required />
+                     <TextArea label="Conduta" value={formData.conduta} onChange={(e:any) => setFormData({...formData, conduta: e.target.value})} placeholder="Ex: Antibioticoterapia..." required />
+                     <Select label="Status Inicial" value={formData.status} onChange={(e:any) => setFormData({...formData, status: e.target.value})} options={[{value:'Alta', label:'Alta'},{value:'Observação', label:'Observação'},{value:'Aguardando Vaga', label:'Aguardando Vaga'},{value:'Internado', label:'Internado'}]} />
+                     <button type="submit" disabled={loading} className="w-full bg-blue-600 py-5 rounded-3xl font-black text-lg hover:bg-blue-500 shadow-xl transition-all disabled:opacity-50 mt-4 uppercase">CONCLUIR ADMISSÃO</button>
+                  </Card>
+               </div>
+               <div className="lg:col-span-3 space-y-8">
+                  <Card className="p-8 shadow-xl h-full">
+                     <h3 className="font-black text-xl mb-8 flex items-center gap-3 text-emerald-500"><FileText size={24}/> Anamnese Detalhada</h3>
+                     <TextArea label="Queixa Principal" rows={2} value={formData.queixa} onChange={(e:any) => setFormData({...formData, queixa: e.target.value})} />
+                     <TextArea label="HDA (História Atual)" rows={4} value={formData.hda} onChange={(e:any) => setFormData({...formData, hda: e.target.value})} />
+                     <TextArea label="Exame Físico" rows={4} value={formData.exameFisico} onChange={(e:any) => setFormData({...formData, exameFisico: e.target.value})} />
+                  </Card>
+               </div>
             </div>
-          </div>
+          </form>
         )}
 
-        {view === 'list' && (
-          <div className="animate-in fade-in duration-300 space-y-8">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
-              <div>
-                <h2 className="text-3xl font-black text-slate-800 tracking-tight">
-                  Censo Individual
-                </h2>
-                <p className="text-sm text-slate-500 font-bold italic opacity-70">
-                  Aceda exclusivamente aos seus pacientes
-                </p>
-              </div>
-
-              <div className="flex flex-wrap gap-3 items-center">
-                <button
-                  onClick={() => setShowDischarged(!showDischarged)}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-bold transition-all border shadow-sm ${
-                    showDischarged
-                      ? 'bg-slate-200 text-slate-700 border-slate-300'
-                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                  }`}
-                >
-                  <Filter size={16} />
-                  {showDischarged ? 'Ocultar Altas' : 'Mostrar Altas'}
-                </button>
-
-                <div className="flex gap-2 text-[10px] font-black uppercase bg-white p-1.5 rounded-2xl border border-slate-100 shadow-sm">
-                  <div className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-xl">
-                    <span className="mr-1">
-                      {patients.filter((p) => p.status === 'Alta').length}
-                    </span>{' '}
-                    Alta
+        {view === 'details' && selectedPatient && (
+          <div className="space-y-8 animate-in fade-in duration-500 max-w-6xl mx-auto">
+            <div className="bg-white dark:bg-slate-800 p-8 rounded-[3rem] shadow-xl border border-slate-100 dark:border-slate-700 flex flex-col md:flex-row justify-between md:items-center gap-6 relative overflow-hidden">
+               <div className="absolute top-0 left-0 w-3 h-full bg-blue-600"></div>
+               <div className="flex-1">
+                  <div className="flex items-center gap-4 mb-3">
+                    <h2 className="text-4xl font-black tracking-tighter text-slate-900 dark:text-white leading-tight">{selectedPatient.nome}</h2>
+                    <div className="flex gap-2">
+                       <button onClick={openStatusModal} className="p-2.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full hover:scale-110 transition-all"><Edit2 size={20} /></button>
+                       <button onClick={async () => { if(confirm("Apagar paciente permanentemente?")) { await deleteDoc(doc(db, 'artifacts', appId, 'users', user!.uid, 'consultas_medicas', selectedPatient.id)); goBackToList(); } }} className="p-2.5 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full hover:scale-110 transition-all"><Trash2 size={20} /></button>
+                    </div>
                   </div>
-                  <div className="px-3 py-1 bg-yellow-50 text-yellow-700 rounded-xl">
-                    <span className="mr-1">
-                      {patients.filter((p) => p.status === 'Observação').length}
-                    </span>{' '}
-                    Obs
+                  <div className="flex flex-wrap gap-4 text-sm font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest italic">
+                    <span className="bg-slate-100 dark:bg-slate-700 px-3 py-1 rounded-xl text-slate-700 dark:text-slate-300">{selectedPatient.idade} ANOS</span>
+                    <Badge status={selectedPatient.status} />
+                    <span className="flex items-center gap-2"><Clock size={16} /> ADMISSÃO: {new Date(selectedPatient.createdAt?.seconds! * 1000).toLocaleString('pt-PT')}</span>
                   </div>
-                  <div className="px-3 py-1 bg-orange-50 text-orange-700 rounded-xl">
-                    <span className="mr-1">
-                      {
-                        patients.filter((p) => p.status === 'Aguardando Vaga')
-                          .length
-                      }
-                    </span>{' '}
-                    Vaga
-                  </div>
-                </div>
-              </div>
+               </div>
+               <div className="flex gap-2">
+                  <button onClick={suggestCid} disabled={isCidLoading} className="bg-purple-600 text-white px-6 py-3.5 rounded-2xl font-black text-xs hover:bg-purple-700 flex items-center gap-2 shadow-lg active:scale-95 disabled:opacity-50"><Brain size={18} /> SUGERIR CID</button>
+                  <button onClick={exportPdf} className="bg-slate-900 text-white px-6 py-3.5 rounded-2xl text-xs font-black hover:bg-black flex items-center gap-2 shadow-lg active:scale-95"><FileDown size={18} /> EXPORTAR PDF</button>
+               </div>
             </div>
 
-            {patients.length === 0 ? (
-              <div className="py-24 text-center bg-white rounded-[2.5rem] border-2 border-dashed border-slate-200">
-                <p className="text-slate-400 font-bold text-lg mb-4">
-                  Inicie o seu plantão registando um paciente.
-                </p>
-                <button
-                  onClick={() => setView('form')}
-                  className="bg-blue-50 text-blue-600 px-8 py-3 rounded-2xl font-black hover:bg-blue-100 transition-colors"
-                >
-                  ADMITIR PRIMEIRO PACIENTE
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-10">
-                {getGroupedPatients().map(
-                  ([shiftLabel, { info, patients: groupPatients }]) => (
-                    <div
-                      key={shiftLabel}
-                      className="animate-in slide-in-from-bottom-4 duration-500 space-y-5"
-                    >
-                      <div
-                        className={`flex items-center gap-3 px-1 border-l-4 pl-4 ${
-                          info.isNight
-                            ? 'border-indigo-500'
-                            : 'border-orange-500'
-                        }`}
-                      >
-                        <div
-                          className={`p-2 rounded-xl ${
-                            info.isNight
-                              ? 'bg-indigo-50 text-indigo-600'
-                              : 'bg-orange-50 text-orange-600'
-                          }`}
-                        >
-                          {info.icon}
-                        </div>
-                        <h3 className="font-black text-slate-700 uppercase text-xs tracking-widest">
-                          {shiftLabel}
-                        </h3>
-                        <span className="bg-slate-200 text-slate-600 text-[10px] font-black px-2 py-0.5 rounded-full">
-                          {groupPatients.length}
-                        </span>
-                      </div>
-
-                      <div className="hidden md:block bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-                        <table className="w-full text-left border-collapse">
-                          <thead>
-                            <tr className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                              <th className="p-5">Paciente</th>
-                              <th className="p-5">Hipótese / Conduta</th>
-                              <th className="p-5">Status</th>
-                              <th className="p-5">Admissão</th>
-                              <th className="p-5 text-right">Ação</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-50">
-                            {groupPatients.map((patient) => (
-                              <tr
-                                key={patient.id}
-                                onClick={() => openPatientDetails(patient)}
-                                className="hover:bg-blue-50/40 cursor-pointer transition-colors group"
-                              >
-                                <td className="p-5 align-top">
-                                  <div className="font-bold text-slate-800">
-                                    {patient.nome}
-                                  </div>
-                                  <div className="text-xs text-slate-400 font-bold uppercase tracking-tighter">
-                                    {patient.idade} anos
-                                  </div>
-                                </td>
-                                <td className="p-5 align-top max-w-sm">
-                                  <div className="font-bold text-slate-700 text-sm mb-1">
-                                    {patient.hipotese}
-                                  </div>
-                                  <div className="text-xs text-slate-500 line-clamp-1 italic font-medium">
-                                    {patient.conduta}
-                                  </div>
-                                </td>
-                                <td className="p-5 align-top">
-                                  <Badge status={patient.status} />
-                                  {patient.evolutions &&
-                                    patient.evolutions.length > 0 && (
-                                      <div className="mt-1 flex items-center gap-1 text-[10px] font-bold text-purple-600 uppercase">
-                                        <MessageSquare size={10} />{' '}
-                                        {patient.evolutions.length} Evoluções
-                                      </div>
-                                    )}
-                                </td>
-                                <td className="p-5 align-top text-xs font-bold text-slate-400">
-                                  {patient.createdAt
-                                    ? new Date(
-                                        patient.createdAt.seconds * 1000
-                                      ).toLocaleTimeString('pt-PT', {
-                                        hour: '2-digit',
-                                        minute: '2-digit',
-                                      })
-                                    : '-'}
-                                </td>
-                                <td className="p-5 align-top text-right">
-                                  <ChevronRight
-                                    size={24}
-                                    className="ml-auto text-slate-300 group-hover:text-blue-600 transition-colors"
-                                  />
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      <div className="grid grid-cols-1 gap-4 md:hidden">
-                        {groupPatients.map((patient) => (
-                          <Card
-                            key={patient.id}
-                            onClick={() => openPatientDetails(patient)}
-                            className="border-0 shadow-md p-5 active:scale-[0.98] transition-all"
-                          >
-                            <div className="flex justify-between items-start mb-4">
-                              <div>
-                                <div className="font-bold text-lg text-slate-800 leading-tight mb-1">
-                                  {patient.nome}
-                                </div>
-                                <div className="text-[10px] text-slate-400 uppercase font-black tracking-tighter">
-                                  {patient.idade} anos
-                                </div>
-                              </div>
-                              <Badge status={patient.status} />
-                            </div>
-
-                            <div className="bg-slate-50 rounded-2xl p-4 text-xs font-medium text-slate-600 border border-slate-100">
-                              <div className="mb-2">
-                                <span className="font-black text-[9px] text-slate-400 uppercase block mb-1">
-                                  Hipótese
-                                </span>
-                                <span className="line-clamp-1">
-                                  {patient.hipotese}
-                                </span>
-                              </div>
-                              <div className="flex justify-between items-end border-t border-slate-200 pt-2 mt-2">
-                                <span className="text-[10px] text-slate-400 font-bold">
-                                  {patient.createdAt
-                                    ? new Date(
-                                        patient.createdAt.seconds * 1000
-                                      ).toLocaleTimeString('pt-PT', {
-                                        hour: '2-digit',
-                                        minute: '2-digit',
-                                      })
-                                    : 'Agora'}
-                                </span>
-                                {patient.evolutions &&
-                                  patient.evolutions.length > 0 && (
-                                    <span className="bg-purple-50 text-purple-600 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase">
-                                      {patient.evolutions.length} Evoluções
-                                    </span>
-                                  )}
-                              </div>
-                            </div>
-                          </Card>
-                        ))}
-                      </div>
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+               <div className="lg:col-span-2 space-y-8">
+                  <Card className="p-8 shadow-lg border-0 rounded-[2.5rem]">
+                    <h3 className="font-black text-xl mb-8 flex items-center gap-3 text-red-500 dark:text-red-400"><Activity size={26}/> Tendências Vitais</h3>
+                    <div className="grid grid-cols-2 gap-4 mb-8">
+                       <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-700"><span className="text-[9px] font-black text-slate-400 block mb-1 uppercase">P. Arterial</span><span className="font-black text-xl dark:text-slate-200">{selectedPatient.pa}</span></div>
+                       <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-700"><span className="text-[9px] font-black text-slate-400 block mb-1 uppercase">SatO2</span><span className="font-black text-xl dark:text-slate-200">{selectedPatient.sat}%</span></div>
                     </div>
-                  )
-                )}
-              </div>
-            )}
+                    {selectedPatient.vitalsHistory && selectedPatient.vitalsHistory.length > 1 && (
+                      <div className="space-y-6">
+                         <div className="p-4 bg-blue-50/50 dark:bg-blue-900/10 rounded-2xl flex justify-between items-center"><span className="text-[9px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">Frequência Cardíaca</span><SparkLine data={selectedPatient.vitalsHistory.map(v => parseFloat(v.fc))} color="#3b82f6" /></div>
+                         <div className="p-4 bg-red-50/50 dark:bg-red-900/10 rounded-2xl flex justify-between items-center"><span className="text-[9px] font-black text-red-600 dark:text-red-400 uppercase tracking-widest">Temperatura</span><SparkLine data={selectedPatient.vitalsHistory.map(v => parseFloat(v.temp))} color="#ef4444" /></div>
+                      </div>
+                    )}
+                  </Card>
+                  
+                  <div className="bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl text-slate-400">
+                    <h3 className="font-black text-lg mb-6 flex items-center gap-3 text-blue-400 uppercase tracking-widest"><ShieldCheck size={20}/> Auditoria</h3>
+                    <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                       {selectedPatient.auditLog?.map((log, i) => (
+                         <div key={i} className="text-[10px] font-medium border-l border-slate-800 pl-3 py-1"><span className="text-slate-600 font-mono block mb-1">{new Date(log.timestamp).toLocaleString()}</span><span className="text-blue-500/80 font-black mr-2 uppercase">{log.action}:</span> {log.details}</div>
+                       ))}
+                    </div>
+                  </div>
+               </div>
+
+               <div className="lg:col-span-3 space-y-8">
+                  <Card className="p-8 shadow-lg border-0 rounded-[2.5rem]">
+                     <h3 className="font-black text-2xl mb-8 border-b border-slate-50 dark:border-slate-700 pb-4 flex items-center gap-3 text-purple-600 dark:text-purple-400"><History size={26}/> Evolução e Histórico</h3>
+                     <div className="space-y-6">
+                        {selectedPatient.evolutions?.map((ev, i) => (
+                          <div key={i} className={`p-5 rounded-3xl border shadow-sm relative animate-in fade-in slide-in-from-left-2 ${ev.text.includes('MUDANÇA DE STATUS') ? 'bg-blue-50/30 border-blue-100 dark:bg-blue-900/10 dark:border-blue-800/50' : 'bg-white dark:bg-slate-900/50 border-slate-100 dark:border-slate-700'}`}>
+                             <div className="text-[10px] font-black text-slate-300 dark:text-slate-500 mb-3 uppercase tracking-widest flex justify-between"><span>{new Date(ev.createdAt).toLocaleString('pt-PT')}</span><span className="opacity-40">DR. {user.email?.split('@')[0]}</span></div>
+                             <p className="text-slate-700 dark:text-slate-300 font-bold leading-relaxed whitespace-pre-wrap">{ev.text}</p>
+                          </div>
+                        ))}
+                        {selectedPatient.status !== 'Alta' && (
+                          <div className="flex flex-col gap-3 pt-6 animate-in slide-in-from-bottom-4">
+                             <div className="relative">
+                               <textarea value={evolutionText} onChange={(e) => setEvolutionText(e.target.value)} placeholder="Registe a evolução, novos sinais vitais ou conduta..." className="w-full p-6 rounded-[2rem] border-2 border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/20 outline-none min-h-[160px] dark:text-white transition-all font-medium" />
+                               <button onClick={async () => {
+                                 if(!evolutionText.trim()) return;
+                                 setLoading(true);
+                                 try {
+                                   const pRef = doc(db, 'artifacts', appId, 'users', user.uid, 'consultas_medicas', selectedPatient.id);
+                                   await updateDoc(pRef, { evolutions: arrayUnion({ text: evolutionText, createdAt: new Date().toISOString(), createdBy: user.uid }) });
+                                   setEvolutionText(''); showNotification("Evoluído com sucesso!");
+                                 } catch(e) { showNotification("Erro", "error"); } finally { setLoading(false); }
+                               }} disabled={loading || !evolutionText.trim()} className="absolute bottom-4 right-4 bg-blue-600 text-white p-4 rounded-2xl hover:bg-blue-700 shadow-xl active:scale-90 transition-all disabled:opacity-50"><Send size={24} /></button>
+                             </div>
+                          </div>
+                        )}
+                     </div>
+                  </Card>
+               </div>
+            </div>
           </div>
         )}
       </main>
