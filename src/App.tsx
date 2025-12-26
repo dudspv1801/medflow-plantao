@@ -545,20 +545,21 @@ export default function App() {
   setLoading(true);
   try {
     const patientRef = doc(db, 'artifacts', appId, 'public', 'data', 'consultas_medicas', selectedPatient.id);
-    const oldStatus = selectedPatient.status;
+    
+    // Define quais status encerram o plantão para o médico
+    const statusEncerramPlantao = ['Alta', 'Internado', 'Transferido'];
+    const isFinalStatus = statusEncerramPlantao.includes(statusUpdateValue);
 
     const newEvolution: Evolution = {
-      text: `🔄 STATUS ALTERADO\nDe: ${oldStatus}\nPara: ${statusUpdateValue}\nMotivo: ${statusJustification}`,
+      text: `🔄 STATUS ALTERADO\nDe: ${selectedPatient.status}\nPara: ${statusUpdateValue}\nMotivo: ${statusJustification}`,
       createdAt: new Date().toISOString(),
       createdBy: user.uid,
     };
 
-    // ATUALIZAÇÃO: Define 'active: false' para Alta, Internado ou Transferido
-    const isFinalStatus = ['Alta', 'Internado', 'Transferido'].includes(statusUpdateValue);
-
     await updateDoc(patientRef, {
       status: statusUpdateValue,
-      active: !isFinalStatus, // Se for um status final, active será false
+      // Se for Alta, Internado ou Transferido, active vira 'false'
+      active: !isFinalStatus, 
       evolutions: arrayUnion(newEvolution),
     });
 
@@ -671,34 +672,42 @@ export default function App() {
   };
 
   const getGroupedPatients = () => {
-    const filtered = patients.filter((p) => {
-      const matchesSearch = p.nome
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase());
-      const matchesStatus = showDischarged || p.status !== 'Alta';
-      return matchesSearch && matchesStatus;
-    });
+  const filtered = patients.filter((p) => {
+    const matchesSearch = p.nome
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase());
 
-    const grouped: Record<string, { info: ReturnType<typeof getShiftInfo>; patients: Patient[] }> =
-      {};
+    // Define quais status são considerados "Encerrados"
+    const statusEncerrados = ['Alta', 'Internado', 'Transferido'];
+    
+    // O paciente aparece se:
+    // 1. O usuário marcou para ver os encerrados (showDischarged)
+    // 2. OU se o status dele NÃO está na lista de encerrados
+    const matchesStatus = showDischarged || !statusEncerrados.includes(p.status);
 
-    filtered.forEach((patient) => {
-      const date = patient.createdAt
-        ? new Date(patient.createdAt.seconds * 1000)
-        : new Date();
-      const shiftInfo = getShiftInfo(date);
-      const key = shiftInfo.label;
+    return matchesSearch && matchesStatus;
+  });
 
-      if (!grouped[key]) {
-        grouped[key] = { info: shiftInfo, patients: [] };
-      }
-      grouped[key].patients.push(patient);
-    });
+  const grouped: Record<string, { info: ReturnType<typeof getShiftInfo>; patients: Patient[] }> =
+    {};
 
-    return Object.entries(grouped).sort(
-      ([, a], [, b]) => b.info.rawDate - a.info.rawDate
-    );
-  };
+  filtered.forEach((patient) => {
+    const date = patient.createdAt
+      ? new Date(patient.createdAt.seconds * 1000)
+      : new Date();
+    const shiftInfo = getShiftInfo(date);
+    const key = shiftInfo.label;
+
+    if (!grouped[key]) {
+      grouped[key] = { info: shiftInfo, patients: [] };
+    }
+    grouped[key].patients.push(patient);
+  });
+
+  return Object.entries(grouped).sort(
+    ([, a], [, b]) => b.info.rawDate - a.info.rawDate
+  );
+};
 
   if (!user)
     return (
@@ -1028,188 +1037,191 @@ export default function App() {
         )}
 
         {view === 'details' && selectedPatient && (
-          <div className="animate-in fade-in slide-in-from-right-4 duration-300 space-y-6">
-            <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-              <div>
-                <div className="flex items-center gap-3 mb-2">
-                  <h2 className="text-3xl font-bold text-slate-800">{selectedPatient.nome}</h2>
-                  <div className="flex items-center gap-2">
-                    <Badge status={selectedPatient.status} />
-                    <button
-                      onClick={openStatusModal}
-                      className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full transition-colors"
-                      title="Alterar Status"
-                    >
-                      <Edit2 size={14} />
-                    </button>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-4 text-sm text-slate-500">
-                  <span>{selectedPatient.idade} anos</span>
-                  <span>•</span>
-                  <span>
-                    Admitido em:{' '}
-                    {selectedPatient.createdAt
-                      ? new Date(selectedPatient.createdAt.seconds * 1000).toLocaleString('pt-BR')
-                      : '-'}
-                  </span>
-                </div>
-              </div>
-              {selectedPatient.status !== 'Alta' && (
-                <div className="flex items-center gap-2 bg-orange-50 text-orange-700 px-4 py-2 rounded-lg border border-orange-100">
-                  <AlertCircle size={20} />
-                  <span className="font-medium">Paciente Ativo no Plantão</span>
-                </div>
-              )}
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 space-y-6">
-                <Card className="p-6">
-                  <h3 className="font-semibold text-lg text-slate-800 mb-4 border-b pb-2 flex items-center gap-2">
-                    <FileText size={20} className="text-blue-500" /> Admissão Original
-                  </h3>
-                  <div className="space-y-4">
-                    <div>
-                      <span className="text-xs font-bold text-slate-400 uppercase">Queixa Principal</span>
-                      <p className="text-slate-700 bg-slate-50 p-2 rounded-lg mt-1">{selectedPatient.queixa}</p>
-                    </div>
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div>
-                        <span className="text-xs font-bold text-slate-400 uppercase">Sinais Vitais</span>
-                        <div className="text-slate-700 bg-slate-50 p-2 rounded-lg mt-1 text-sm font-mono">
-                          PA: {selectedPatient.pa} | FC: {selectedPatient.fc} | Sat: {selectedPatient.sat}%
-                        </div>
-                      </div>
-                      <div>
-                        <span className="text-xs font-bold text-slate-400 uppercase">Hipótese Diagnóstica</span>
-                        <p className="text-slate-800 font-medium bg-slate-50 p-2 rounded-lg mt-1">{selectedPatient.hipotese}</p>
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-xs font-bold text-slate-400 uppercase">HDA</span>
-                      <p className="text-slate-700 text-sm whitespace-pre-wrap mt-1">{selectedPatient.hda}</p>
-                    </div>
-                    <div>
-                      <span className="text-xs font-bold text-slate-400 uppercase">Exame Físico</span>
-                      <p className="text-slate-700 text-sm whitespace-pre-wrap mt-1 bg-slate-50 p-3 rounded">{selectedPatient.exameFisico}</p>
-                    </div>
-                    <div>
-                      <span className="text-xs font-bold text-slate-400 uppercase">Conduta Inicial</span>
-                      <p className="text-slate-700 text-sm whitespace-pre-wrap mt-1 bg-blue-50 p-3 rounded border border-blue-100">{selectedPatient.conduta}</p>
-                    </div>
-                  </div>
-                </Card>
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-lg text-slate-800 flex items-center gap-2">
-                    <History size={20} className="text-purple-500" /> Histórico de Evoluções
-                  </h3>
-                  {(!selectedPatient.evolutions || selectedPatient.evolutions.length === 0) && (
-                    <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-slate-400">
-                      Nenhuma evolução registrada além da admissão.
-                    </div>
-                  )}
-                  {selectedPatient.evolutions && selectedPatient.evolutions.map((ev, index) => (
-                    <div key={index} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative pl-10">
-                      <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-purple-200 rounded-l-xl"></div>
-                      <div className="absolute left-3 top-4 bg-white border border-purple-200 p-1 rounded-full text-purple-600">
-                        <MessageSquare size={14} />
-                      </div>
-                      <div className="flex justify-between items-start mb-2">
-                        <span className="text-xs font-bold text-slate-500 uppercase">Evolução Médica</span>
-                        <span className="text-xs text-slate-400">{new Date(ev.createdAt).toLocaleString('pt-BR')}</span>
-                      </div>
-                      <p className="text-slate-700 whitespace-pre-wrap">{ev.text}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-          <div className="lg:col-span-1">
-  {/* Card do PDF - Sempre Visível */}
-  <Card className="p-4 mb-4 bg-blue-50 border-t-4 border-t-blue-500">
-    <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
-      <FileText size={18} className="text-blue-600" /> Relatório Médico
-    </h3>
-    <p className="text-xs text-slate-600 mb-4">Gere um relatório PDF do atendimento com assinatura digital.</p>
-    <PDFDownloadLink
-      document={
-        <ServiceReportPDF 
-          atendimentoData={{ 
-            clinicName: 'MedFlow - Plantão Zero', 
-            professionalName: `${user?.displayName || 'Médico'} - CRM/${userCRM || '___'} - ${userUF || '___'}`, 
-            patientName: selectedPatient.nome || '', 
-            patientAge: selectedPatient.idade || '', 
-            patientId: selectedPatient.id || '',
-            patientDocument: (selectedPatient as any).documento || '-', 
-            notes: `--- ADMISSÃO ---\nQueixa: ${selectedPatient.queixa || ''}\n\nHDA: ${selectedPatient.hda || ''}\n\nExame Físico: ${selectedPatient.exameFisico || ''}\n\nHipótese: ${selectedPatient.hipotese || ''}\n\nConduta: ${selectedPatient.conduta || ''}\n\n` + 
-                   (selectedPatient.evolutions?.map((ev: any) => 
-                     `--- EVOLUÇÃO (${new Date(ev.createdAt).toLocaleString('pt-BR')}) ---\n${ev.text}`
-                   ).join('\n\n') || ''),
-            date: selectedPatient.createdAt 
-              ? new Date(selectedPatient.createdAt.seconds * 1000).toISOString() 
-              : new Date().toISOString() 
-          }} 
-          auditHash={auditHash} 
-        />
-      }
-      fileName={`atendimento-${selectedPatient.nome.replace(/\s+/g, '_')}.pdf`}
-    >
-      {({ loading }) => (
-        <button 
-          type="button" 
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 transition-all disabled:opacity-50" 
-          disabled={loading}
-        >
-          <FileText size={16} />
-          {loading ? 'Gerando PDF...' : 'Baixar PDF para Assinar'}
-        </button>
+  <div className="animate-in fade-in slide-in-from-right-4 duration-300 space-y-6">
+    {/* Cabeçalho de Identificação */}
+    <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+      <div>
+        <div className="flex items-center gap-3 mb-2">
+          <h2 className="text-3xl font-bold text-slate-800">{selectedPatient.nome}</h2>
+          <div className="flex items-center gap-2">
+            <Badge status={selectedPatient.status} />
+            <button
+              onClick={openStatusModal}
+              className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full transition-colors"
+              title="Alterar Status"
+            >
+              <Edit2 size={14} />
+            </button>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-4 text-sm text-slate-500">
+          <span>{selectedPatient.idade} anos</span>
+          <span>•</span>
+          <span>
+            Admitido em:{' '}
+            {selectedPatient.createdAt
+              ? new Date(selectedPatient.createdAt.seconds * 1000).toLocaleString('pt-BR')
+              : '-'}
+          </span>
+        </div>
+      </div>
+      {/* Alerta de Paciente Ativo: Aparece se NÃO for um status de encerramento */}
+      {selectedPatient.status !== 'Alta' && selectedPatient.status !== 'Internado' && selectedPatient.status !== 'Transferido' && (
+        <div className="flex items-center gap-2 bg-orange-50 text-orange-700 px-4 py-2 rounded-lg border border-orange-100">
+          <AlertCircle size={20} />
+          <span className="font-medium">Paciente Ativo no Plantão</span>
+        </div>
       )}
-    </PDFDownloadLink>
-  </Card>
-
-  {/* Condicional: Nova Evolução OU Mensagem de Atendimento Encerrado */}
-  {/* Atendimento é considerado "Ativo" se NÃO for Alta, Internado ou Transferido */}
-  {selectedPatient.status !== 'Alta' && selectedPatient.status !== 'Internado' && selectedPatient.status !== 'Transferido' ? (
-    <Card className="p-4 sticky top-24 border-t-4 border-t-green-500">
-      <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
-        <PlusCircle size={18} className="text-green-600" /> Nova Evolução
-      </h3>
-      <p className="text-xs text-slate-500 mb-4">Registre a melhora clínica ou novas condutas.</p>
-      <textarea
-        value={evolutionText}
-        onChange={(e) => setEvolutionText(e.target.value)}
-        className="w-full p-3 border border-slate-300 rounded-lg outline-none min-h-[150px] text-sm mb-3"
-        placeholder="Ex: Paciente refere melhora da dor..."
-      />
-      <button
-        onClick={handleAddEvolution}
-        disabled={loading || !evolutionText.trim()}
-        className="w-full bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg font-medium flex items-center justify-center gap-2"
-      >
-        {loading ? 'Salvando...' : <><Send size={16} /> Salvar Evolução</>}
-      </button>
-    </Card>
-  ) : (
-    <div className="bg-green-50 p-6 rounded-xl border border-green-200 text-green-800 text-center">
-      <CheckCircle size={32} className="mx-auto mb-2 text-green-500 opacity-70" />
-      <p className="font-bold">Atendimento Encerrado</p>
-      <p className="text-sm opacity-75">
-        Status: {selectedPatient.status}. O prontuário foi finalizado.
-      </p>
     </div>
-  )}
 
-  {selectedPatient.pendencias && (
-    <div className="mt-4 bg-orange-50 p-4 rounded-xl border border-orange-200">
-      <h4 className="font-bold text-orange-800 text-sm mb-2 flex items-center gap-2">
-        <AlertCircle size={14} /> Pendências Iniciais
-      </h4>
-      <p className="text-sm text-orange-900">{selectedPatient.pendencias}</p>
-    </div>
-  )}
-</div>
+    {/* Grid Principal: Conteúdo (Esquerda) e Ações (Direita) */}
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      
+      {/* COLUNA DA ESQUERDA: Histórico e Admissão */}
+      <div className="lg:col-span-2 space-y-6">
+        <Card className="p-6">
+          <h3 className="font-semibold text-lg text-slate-800 mb-4 border-b pb-2 flex items-center gap-2">
+            <FileText size={20} className="text-blue-500" /> Admissão Original
+          </h3>
+          <div className="space-y-4">
+            <div>
+              <span className="text-xs font-bold text-slate-400 uppercase">Queixa Principal</span>
+              <p className="text-slate-700 bg-slate-50 p-2 rounded-lg mt-1">{selectedPatient.queixa}</p>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <span className="text-xs font-bold text-slate-400 uppercase">Sinais Vitais</span>
+                <div className="text-slate-700 bg-slate-50 p-2 rounded-lg mt-1 text-sm font-mono">
+                  PA: {selectedPatient.pa} | FC: {selectedPatient.fc} | Sat: {selectedPatient.sat}%
+                </div>
+              </div>
+              <div>
+                <span className="text-xs font-bold text-slate-400 uppercase">Hipótese Diagnóstica</span>
+                <p className="text-slate-800 font-medium bg-slate-50 p-2 rounded-lg mt-1">{selectedPatient.hipotese}</p>
+              </div>
+            </div>
+            <div>
+              <span className="text-xs font-bold text-slate-400 uppercase">HDA</span>
+              <p className="text-slate-700 text-sm whitespace-pre-wrap mt-1">{selectedPatient.hda}</p>
+            </div>
+            <div>
+              <span className="text-xs font-bold text-slate-400 uppercase">Exame Físico</span>
+              <p className="text-slate-700 text-sm whitespace-pre-wrap mt-1 bg-slate-50 p-3 rounded">{selectedPatient.exameFisico}</p>
+            </div>
+            <div>
+              <span className="text-xs font-bold text-slate-400 uppercase">Conduta Inicial</span>
+              <p className="text-slate-700 text-sm whitespace-pre-wrap mt-1 bg-blue-50 p-3 rounded border border-blue-100">{selectedPatient.conduta}</p>
             </div>
           </div>
+        </Card>
+
+        <div className="space-y-4">
+          <h3 className="font-semibold text-lg text-slate-800 flex items-center gap-2">
+            <History size={20} className="text-purple-500" /> Histórico de Evoluções
+          </h3>
+          {(!selectedPatient.evolutions || selectedPatient.evolutions.length === 0) && (
+            <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-slate-400">
+              Nenhuma evolução registrada além da admissão.
+            </div>
+          )}
+          {selectedPatient.evolutions && selectedPatient.evolutions.map((ev, index) => (
+            <div key={index} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative pl-10">
+              <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-purple-200 rounded-l-xl"></div>
+              <div className="absolute left-3 top-4 bg-white border border-purple-200 p-1 rounded-full text-purple-600">
+                <MessageSquare size={14} />
+              </div>
+              <div className="flex justify-between items-start mb-2">
+                <span className="text-xs font-bold text-slate-500 uppercase">Evolução Médica</span>
+                <span className="text-xs text-slate-400">{new Date(ev.createdAt).toLocaleString('pt-BR')}</span>
+              </div>
+              <p className="text-slate-700 whitespace-pre-wrap">{ev.text}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* COLUNA DA DIREITA: Ações de PDF e Desfecho */}
+      <div className="lg:col-span-1 space-y-4">
+        {/* Card do PDF - Sempre Visível */}
+        <Card className="p-4 bg-blue-50 border-t-4 border-t-blue-500">
+          <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
+            <FileText size={18} className="text-blue-600" /> Relatório Médico
+          </h3>
+          <p className="text-xs text-slate-600 mb-4">Gere um relatório PDF com o histórico completo.</p>
+          <PDFDownloadLink
+            document={
+              <ServiceReportPDF 
+                atendimentoData={{ 
+                  clinicName: 'MedFlow - Plantão Zero', 
+                  professionalName: `${user?.displayName || 'Médico'} - CRM/${userCRM || '___'} - ${userUF || '___'}`, 
+                  patientName: selectedPatient.nome || '', 
+                  patientAge: selectedPatient.idade || '', 
+                  patientId: selectedPatient.id || '',
+                  patientDocument: (selectedPatient as any).documento || '-', 
+                  notes: `--- ADMISSÃO ---\nQueixa: ${selectedPatient.queixa || ''}\n\nHDA: ${selectedPatient.hda || ''}\n\nExame Físico: ${selectedPatient.exameFisico || ''}\n\nHipótese: ${selectedPatient.hipotese || ''}\n\nConduta: ${selectedPatient.conduta || ''}\n\n` + 
+                         (selectedPatient.evolutions?.map((ev: any) => 
+                           `--- EVOLUÇÃO (${new Date(ev.createdAt).toLocaleString('pt-BR')}) ---\n${ev.text}`
+                         ).join('\n\n') || ''),
+                  date: selectedPatient.createdAt 
+                    ? new Date(selectedPatient.createdAt.seconds * 1000).toISOString() 
+                    : new Date().toISOString() 
+                }} 
+                auditHash={auditHash} 
+              />
+            }
+            fileName={`atendimento-${selectedPatient.nome.replace(/\s+/g, '_')}.pdf`}
+          >
+            {({ loading }) => (
+              <button 
+                type="button" 
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 transition-all disabled:opacity-50" 
+                disabled={loading}
+              >
+                <FileText size={16} />
+                {loading ? 'Gerando PDF...' : 'Baixar PDF'}
+              </button>
+            )}
+          </PDFDownloadLink>
+        </Card>
+
+        {/* Condicional: Nova Evolução OU Mensagem de Encerrado */}
+        {selectedPatient.status !== 'Alta' && selectedPatient.status !== 'Internado' && selectedPatient.status !== 'Transferido' ? (
+          <Card className="p-4 sticky top-24 border-t-4 border-t-green-500">
+            <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
+              <PlusCircle size={18} className="text-green-600" /> Nova Evolução
+            </h3>
+            <textarea
+              value={evolutionText}
+              onChange={(e) => setEvolutionText(e.target.value)}
+              className="w-full p-3 border border-slate-300 rounded-lg outline-none min-h-[150px] text-sm mb-3"
+              placeholder="Ex: Paciente refere melhora..."
+            />
+            <button
+              onClick={handleAddEvolution}
+              disabled={loading || !evolutionText.trim()}
+              className="w-full bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg font-medium flex items-center justify-center gap-2"
+            >
+              {loading ? 'Salvando...' : <><Send size={16} /> Salvar Evolução</>}
+            </button>
+          </Card>
+        ) : (
+          <div className="bg-green-50 p-6 rounded-xl border border-green-200 text-green-800 text-center">
+            <CheckCircle size={32} className="mx-auto mb-2 text-green-500 opacity-70" />
+            <p className="font-bold">Atendimento Encerrado</p>
+            <p className="text-sm opacity-75">Status: {selectedPatient.status}.</p>
+          </div>
         )}
+
+        {selectedPatient.pendencias && (
+          <div className="mt-4 bg-orange-50 p-4 rounded-xl border border-orange-200">
+            <h4 className="font-bold text-orange-800 text-sm mb-2">Pendências Iniciais</h4>
+            <p className="text-sm text-orange-900">{selectedPatient.pendencias}</p>
+          </div>
+        )}
+      </div> {/* Fim Coluna Direita */}
+    </div> {/* Fim Grid Principal */}
+  </div>
+)}
 
        {view === 'list' && (
   <div className="animate-in fade-in duration-300">
