@@ -349,14 +349,15 @@ export default function App() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [darkMode, setDarkMode] = useState(false);
 
-// Efeito para aplicar/remover a classe 'dark' no HTML
-useEffect(() => {
-  if (darkMode) {
-    document.documentElement.classList.add('dark');
-  } else {
-    document.documentElement.classList.remove('dark');
-  }
-}, [darkMode]);
+  // Efeito para aplicar/remover a classe 'dark' no HTML
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [darkMode]);
+
   const [view, setView] = useState<'list' | 'form' | 'details'>('list');
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [loading, setLoading] = useState(false);
@@ -398,7 +399,7 @@ useEffect(() => {
 
     let linkApple = document.querySelector(
       "link[rel='apple-touch-icon']"
-    ) as HTMLLinkElement;
+    ) as HTMLLinkElement | null;
     if (!linkApple) {
       linkApple = document.createElement('link');
       linkApple.rel = 'apple-touch-icon';
@@ -443,10 +444,10 @@ useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
     });
-    return (
-  <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-sans pb-20 w-full transition-colors duration-300">) </div>
-      
-  ), [];
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   const handleGoogleLogin = async () => {
     setAuthLoading(true);
@@ -880,20 +881,22 @@ useEffect(() => {
                 />
               </div>
             </div>
-<div className="flex items-center gap-2 sm:gap-4">
-  {/* Botão Dark Mode */}
-  <button
-    onClick={() => setDarkMode(!darkMode)}
-    className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-slate-600 dark:text-yellow-400"
-    title={darkMode ? "Ativar Modo Claro" : "Ativar Modo Escuro"}
-  >
-    {darkMode ? <Sun size={20} /> : <Moon size={20} />}
-  </button>
 
-  <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
-  
-  {/* Mantenha o restante dos seus botões (Install, Voltar, Logout) abaixo... */}
-</div>
+            <div className="flex items-center gap-2 sm:gap-4 px-6">
+              {/* Botão Dark Mode */}
+              <button
+                onClick={() => setDarkMode(!darkMode)}
+                className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-slate-600 dark:text-yellow-400"
+                title={darkMode ? 'Ativar Modo Claro' : 'Ativar Modo Escuro'}
+              >
+                {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+              </button>
+
+              <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
+              
+              {/* Espaço reservado para outros botões se necessário */}
+            </div>
+
             <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-2">
               <button
                 onClick={() => setIsStatusModalOpen(false)}
@@ -1344,6 +1347,4 @@ useEffect(() => {
       </main>
     </div>
   );
-}
-)
 }
