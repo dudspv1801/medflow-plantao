@@ -6,7 +6,6 @@ import {
   GoogleAuthProvider, 
   signInWithPopup, 
   signOut, 
-  signInWithCustomToken,
   type User 
 } from 'firebase/auth';
 import { 
@@ -22,10 +21,10 @@ import {
   Timestamp
 } from 'firebase/firestore';
 import { 
-  Clipboard, PlusCircle, Users, Save, Activity, CheckCircle, Clock, AlertCircle, FileText, 
-  LogOut, Stethoscope, BedDouble, Ambulance, ArrowLeft, MessageSquare, Send, History, 
-  Smartphone, Share, X, ChevronRight, Filter, Sun, Moon, Edit2, Trash2, Search, 
-  Brain, Lock, FileDown, ShieldCheck, LineChart
+  PlusCircle, Users, Activity, Clock, FileText, 
+  LogOut, Stethoscope, ArrowLeft, Send, History, 
+  Share, X, ChevronRight, Filter, Sun, Moon, Edit2, Trash2, Search, 
+  Brain, Lock, FileDown, ShieldCheck
 } from 'lucide-react';
 
 // --- CONFIGURAÇÃO FIREBASE ---
@@ -43,7 +42,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = "plantao-zero-app";
-const apiKey = ""; // Chave Gemini API (injetada automaticamente)
+const apiKey = ""; // Chave Gemini API (injetada pelo ambiente)
 
 // --- TIPAGENS ---
 interface VitalRecord {
@@ -105,7 +104,7 @@ const callGemini = async (prompt: string, retryCount = 0): Promise<string> => {
   } catch (e) { return "Erro na ligação à IA."; }
 };
 
-// --- COMPONENTES UI (MANTENDO A SUA ESTRUTURA ORIGINAL) ---
+// --- COMPONENTES UI ---
 
 const Card: React.FC<{ children: React.ReactNode; className?: string; onClick?: () => void }> = ({ children, className = "", onClick }) => (
   <div 
@@ -170,6 +169,37 @@ const SparkLine = ({ data, color }: { data: number[], color: string }) => {
   );
 };
 
+// --- COMPONENTES AUXILIARES ---
+const InstallModal: React.FC<{ onClose: () => void }> = ({ onClose }) => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in slide-in-from-bottom-10 duration-300">
+      <div className="p-4 bg-blue-600 text-white flex justify-between items-center">
+        <h3 className="font-bold text-lg flex items-center gap-2">
+          Instalar App
+        </h3>
+        <button onClick={onClose} className="p-1 hover:bg-blue-700 rounded-full transition-colors">
+          <X size={20} />
+        </button>
+      </div>
+      <div className="p-6 space-y-6">
+        <p className="text-slate-600 dark:text-slate-300 text-sm">
+          Adicione o MedFlow ao ecrã inicial para aceder rapidamente.
+        </p>
+        <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+          <h4 className="font-bold text-slate-800 dark:text-slate-100 mb-2">Instalação</h4>
+          <ol className="text-sm text-slate-600 dark:text-slate-400 space-y-2 list-decimal list-inside">
+            <li>Toque no botão <Share size={12} className="inline mx-1"/> Compartilhar.</li>
+            <li>Selecione "Adicionar ao Ecrã Principal".</li>
+          </ol>
+        </div>
+      </div>
+      <div className="p-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-center">
+        <button onClick={onClose} className="text-blue-600 font-medium text-sm hover:underline">Fechar</button>
+      </div>
+    </div>
+  </div>
+);
+
 // --- COMPONENTE PRINCIPAL ---
 
 export default function App() {
@@ -183,6 +213,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isLocked, setIsLocked] = useState(false);
   const [showDischarged, setShowDischarged] = useState(false);
+  const [showInstallModal, setShowInstallModal] = useState(false);
   
   // Modais
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
@@ -210,8 +241,8 @@ export default function App() {
       style.id = styleId;
       style.innerHTML = `
         #root { width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; text-align: left !important; }
-        body { margin: 0; padding: 0; min-height: 100vh; display: block; overflow-x: hidden; transition: background 0.3s; }
-        .dark body { background-color: #0f172a; }
+        body { margin: 0; padding: 0; min-height: 100vh; display: block; overflow-x: hidden; transition: background-color 0.3s; background-color: #f8fafc; }
+        .dark body { background-color: #0f172a; color: #f8fafc; }
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
       `;
@@ -259,7 +290,7 @@ export default function App() {
         const up = data.find(p => p.id === selectedPatient.id);
         if (up) setSelectedPatient(up);
       }
-    });
+    }, (error) => console.error("Firestore Error:", error));
   }, [user, selectedPatient?.id]);
 
   // --- AÇÕES ---
@@ -334,7 +365,6 @@ export default function App() {
     a.click();
   };
 
-  // --- FILTRAGEM ---
   const filteredPatients = useMemo(() => {
     return patients.filter(p => {
       const matchSearch = p.nome.toLowerCase().includes(searchQuery.toLowerCase()) || p.hipotese.toLowerCase().includes(searchQuery.toLowerCase());
@@ -342,6 +372,25 @@ export default function App() {
       return matchSearch && matchStatus;
     });
   }, [patients, searchQuery, showDischarged]);
+
+  const goBackToList = () => {
+    setSelectedPatient(null);
+    setEvolutionText('');
+    setView('list');
+  };
+
+  const openPatientDetails = (patient: Patient) => {
+    setSelectedPatient(patient);
+    setView('details');
+  };
+
+  const openStatusModal = () => {
+    if (selectedPatient) {
+      setStatusUpdateValue(selectedPatient.status);
+      setStatusJustification('');
+      setIsStatusModalOpen(true);
+    }
+  };
 
   // --- TELA DE BLOQUEIO ---
   if (isLocked) return (
@@ -353,11 +402,11 @@ export default function App() {
         <input 
           type="password" 
           maxLength={4} 
-          className="w-40 text-center text-4xl font-black bg-slate-800 border-2 border-slate-700 rounded-3xl p-4 focus:border-blue-500 outline-none mb-4"
+          className="w-40 text-center text-4xl font-black bg-slate-800 border-2 border-slate-700 rounded-3xl p-4 focus:border-blue-500 outline-none mb-4 text-white"
           autoFocus
           onChange={(e) => { if (e.target.value === '1234') setIsLocked(false); }} 
         />
-        <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest">Código de segurança PIN</p>
+        <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest">Código padrão: 1234</p>
       </div>
     </div>
   );
@@ -367,8 +416,12 @@ export default function App() {
       <Card className="w-full max-w-md p-10 text-center mx-auto shadow-2xl bg-white/95 border-0 animate-in fade-in duration-500">
         <div className="bg-blue-600 text-white p-5 rounded-[2rem] w-20 h-20 flex items-center justify-center mx-auto mb-8 shadow-xl"><Stethoscope size={44} /></div>
         <h1 className="text-4xl font-black text-slate-800 mb-2 tracking-tighter">MedFlow</h1>
-        <p className="text-slate-500 mb-12 font-medium">Gestão Privada de Plantão Médico</p>
+        <p className="text-slate-500 mb-12 font-medium leading-tight">Gestão Privada de Plantão Médico</p>
         <button onClick={() => signInWithPopup(auth, new GoogleAuthProvider())} className="w-full bg-white border-2 border-slate-100 py-4 rounded-2xl flex items-center justify-center gap-4 font-black text-slate-700 hover:bg-slate-50 hover:border-blue-200 transition-all active:scale-95 shadow-sm"><img src="https://www.google.com/favicon.ico" alt="G" className="w-6 h-6" />Entrar com conta Google</button>
+        <div className="mt-8 p-4 bg-blue-50 rounded-2xl border border-blue-100 text-left">
+           <p className="text-[11px] text-blue-700 font-bold uppercase tracking-widest mb-1 flex items-center gap-1"><ShieldCheck size={12}/> Privacidade Total</p>
+           <p className="text-[11px] text-blue-600 leading-tight font-medium">Os seus dados são isolados. Nenhum outro médico consegue aceder à sua lista pessoal.</p>
+        </div>
       </Card>
     </div>
   );
@@ -384,14 +437,17 @@ export default function App() {
           
           <div className="flex-1 max-w-xl relative">
             <Search className="absolute left-3 top-2.5 text-slate-400" size={18} />
-            <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Pesquisar paciente ou hipótese..." className="w-full pl-10 pr-4 py-2 bg-slate-100 dark:bg-slate-700 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none dark:text-white transition-all" />
+            <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Pesquisar paciente ou diagnóstico..." className="w-full pl-10 pr-4 py-2 bg-slate-100 dark:bg-slate-700 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none dark:text-white transition-all font-medium" />
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-             <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-200 transition-all"><Sun size={20} className="hidden dark:block"/><Moon size={20} className="dark:hidden"/></button>
-             {view === 'list' && <button onClick={() => setView('form')} className="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 hover:bg-blue-700 shadow-lg active:scale-95 transition-all"><PlusCircle size={16} /> <span className="hidden sm:inline uppercase">ADMITIR</span></button>}
-             {view !== 'list' && <button onClick={() => setView('list')} className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400"><ArrowLeft size={20} /></button>}
-             <button onClick={() => signOut(auth)} className="p-2 text-slate-400 hover:text-red-500"><LogOut size={22} /></button>
+             <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-200 transition-all shadow-sm"><Sun size={20} className="hidden dark:block"/><Moon size={20} className="dark:hidden"/></button>
+             <button onClick={() => setShowInstallModal(true)} className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 transition-all shadow-sm">
+                <Smartphone size={20} />
+             </button>
+             {view === 'list' && <button onClick={() => setView('form')} className="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 hover:bg-blue-700 shadow-lg active:scale-95 transition-all"><PlusCircle size={16} /> <span className="hidden sm:inline uppercase tracking-widest">ADMITIR</span></button>}
+             {view !== 'list' && <button onClick={goBackToList} className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 transition-all shadow-sm"><ArrowLeft size={20} /></button>}
+             <button onClick={() => signOut(auth)} className="p-2 text-slate-400 hover:text-red-500 transition-colors ml-1"><LogOut size={22} /></button>
           </div>
         </div>
       </header>
@@ -400,17 +456,19 @@ export default function App() {
         <div className={`fixed top-6 right-6 z-50 px-6 py-4 rounded-2xl shadow-2xl text-white text-sm font-black animate-in slide-in-from-right fade-in duration-300 ${notification.type === 'error' ? 'bg-red-500' : 'bg-emerald-600'}`}>{notification.message}</div>
       )}
 
+      {showInstallModal && <InstallModal onClose={() => setShowInstallModal(false)} />}
+
       {/* MODAL STATUS */}
       {isStatusModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white dark:bg-slate-800 rounded-[2.5rem] w-full max-w-md shadow-2xl p-8 animate-in zoom-in-95 duration-200">
-            <h3 className="font-black text-xl mb-6 flex items-center gap-3 dark:text-white"><Edit2 className="text-blue-500" /> Atualizar Status</h3>
+            <h3 className="font-black text-xl mb-6 flex items-center gap-3 dark:text-white"><Edit2 size={24} className="text-blue-500" /> Atualizar Status</h3>
             <div className="space-y-6">
-               <select className="w-full p-4 rounded-2xl border-2 border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 font-bold dark:text-white" value={statusUpdateValue} onChange={(e) => setStatusUpdateValue(e.target.value)}>
+               <select className="w-full p-4 rounded-2xl border-2 border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 font-bold dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" value={statusUpdateValue} onChange={(e) => setStatusUpdateValue(e.target.value)}>
                   <option value="Alta">Alta Médica</option><option value="Observação">Em Observação</option><option value="Aguardando Vaga">Aguardando Vaga</option><option value="Internado">Internado</option><option value="Transferido">Transferido</option>
                </select>
-               <textarea className="w-full p-4 rounded-2xl border-2 border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 min-h-[100px] dark:text-white" placeholder="Justificativa da alteração..." value={statusJustification} onChange={(e) => setStatusJustification(e.target.value)} />
-               <div className="flex gap-4"><button onClick={() => setIsStatusModalOpen(false)} className="flex-1 py-4 font-black text-slate-400">CANCELAR</button><button onClick={handleUpdateStatus} disabled={!statusJustification.trim()} className="flex-1 bg-blue-600 text-white rounded-2xl font-black shadow-lg disabled:opacity-50">CONFIRMAR</button></div>
+               <textarea className="w-full p-4 rounded-2xl border-2 border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 min-h-[100px] dark:text-white font-medium focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Justificativa obrigatória..." value={statusJustification} onChange={(e) => setStatusJustification(e.target.value)} />
+               <div className="flex gap-4"><button onClick={() => setIsStatusModalOpen(false)} className="flex-1 py-4 font-black text-slate-400 hover:text-slate-600">CANCELAR</button><button onClick={handleUpdateStatus} disabled={!statusJustification.trim() || loading} className="flex-1 bg-blue-600 text-white rounded-2xl font-black shadow-lg shadow-blue-500/20 disabled:opacity-50">CONFIRMAR</button></div>
             </div>
           </div>
         </div>
@@ -425,17 +483,17 @@ export default function App() {
             </div>
 
             {filteredPatients.length === 0 ? (
-              <div className="py-24 text-center bg-white dark:bg-slate-800 rounded-[3rem] border-2 border-dashed border-slate-200 dark:border-slate-700"><ShieldCheck size={48} className="mx-auto mb-4 text-slate-300"/><p className="text-slate-400 font-black text-lg">Nenhum paciente registado.</p><button onClick={() => setView('form')} className="text-blue-600 font-black mt-2 hover:underline">ADMITIR NOVO</button></div>
+              <div className="py-24 text-center bg-white dark:bg-slate-800 rounded-[3rem] border-2 border-dashed border-slate-200 dark:border-slate-700"><ShieldCheck size={48} className="mx-auto mb-4 text-slate-300"/><p className="text-slate-400 font-black text-lg">Nenhum paciente registado.</p><button onClick={() => setView('form')} className="text-blue-600 font-black mt-2 hover:underline tracking-widest uppercase">ADMITIR NOVO</button></div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredPatients.map(p => (
-                  <Card key={p.id} onClick={() => openPatientDetails(p)} className="p-6 hover:scale-[1.02] transition-all relative border-slate-100 shadow-sm">
+                  <Card key={p.id} onClick={() => openPatientDetails(p)} className="p-6 hover:scale-[1.02] transition-all relative border-slate-100 shadow-sm dark:shadow-none">
                     <div className="flex justify-between items-start mb-4">
-                       <div><h3 className="font-black text-lg text-slate-800 dark:text-white leading-tight mb-1">{p.nome}</h3><div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{p.idade} ANOS</div></div>
+                       <div><h3 className="font-black text-lg text-slate-800 dark:text-white leading-tight mb-1 group-hover:text-blue-500">{p.nome}</h3><div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{p.idade} ANOS</div></div>
                        <Badge status={p.status} />
                     </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 italic mb-6">“{p.hipotese}”</p>
-                    <div className="flex items-center justify-between border-t border-slate-50 dark:border-slate-700 pt-4">
+                    <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl border border-slate-100 dark:border-slate-800/50 mb-6 font-medium text-xs italic text-slate-500 dark:text-slate-400 line-clamp-2 italic">“{p.hipotese}”</div>
+                    <div className="flex items-center justify-between border-t border-slate-50 dark:border-slate-700/50 pt-4">
                         <div className="flex gap-4"><div className="text-center"><span className="text-[8px] font-black text-slate-300 block uppercase">PA</span><span className="text-xs font-black dark:text-slate-300">{p.pa}</span></div><div className="text-center"><span className="text-[8px] font-black text-slate-300 block uppercase">SAT</span><span className="text-xs font-black dark:text-slate-300">{p.sat}%</span></div></div>
                         {p.vitalsHistory && p.vitalsHistory.length > 1 && <SparkLine data={p.vitalsHistory.map(v => parseFloat(v.fc))} color="#3b82f6" />}
                         <ChevronRight className="text-slate-300 group-hover:text-blue-500 transition-colors" size={20} />
@@ -451,9 +509,9 @@ export default function App() {
           <form onSubmit={handleSubmit} className="max-w-5xl mx-auto space-y-8 animate-in slide-in-from-bottom-10 duration-500">
              <div className="flex justify-between items-end bg-white dark:bg-slate-800 p-8 rounded-[2.5rem] shadow-sm border border-slate-200 dark:border-slate-700">
                <div><h2 className="text-4xl font-black tracking-tight dark:text-white leading-none mb-2">Admissão</h2><p className="text-slate-500 font-bold italic text-sm">O registo será recuperado automaticamente em caso de fecho.</p></div>
-               <div className="flex gap-2">
-                 <button type="button" onClick={suggestCid} disabled={isCidLoading} className="p-4 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded-2xl hover:scale-105 transition-all"><Brain size={24} /></button>
-                 <button type="button" onClick={() => { if(confirm("Limpar rascunho?")) setFormData(initialFormState); }} className="p-4 bg-red-50 text-red-500 rounded-2xl"><Trash2 size={24} /></button>
+               <div className="flex gap-3">
+                 <button type="button" onClick={suggestCid} disabled={isCidLoading} title="Sugerir CID" className="p-4 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded-2xl hover:scale-105 transition-all shadow-sm"><Brain size={24} /></button>
+                 <button type="button" onClick={() => { if(confirm("Limpar rascunho?")) { setFormData(initialFormState); localStorage.removeItem('medflow-draft'); } }} className="p-4 bg-red-50 dark:bg-red-900/30 text-red-500 dark:text-red-400 rounded-2xl hover:bg-red-100 transition-all shadow-sm"><Trash2 size={24} /></button>
                </div>
             </div>
 
@@ -468,20 +526,20 @@ export default function App() {
                        <Input label="T(ºC)" value={formData.temp} onChange={(e:any) => setFormData({...formData, temp: e.target.value})} className="text-center" />
                     </div>
                   </Card>
-                  <Card className="p-8 bg-slate-900 dark:bg-black text-white border-0 shadow-2xl">
-                     <h3 className="font-black text-xl text-blue-400 mb-8">Diagnóstico</h3>
+                  <Card className="p-8 bg-slate-900 dark:bg-black text-white border-0 shadow-2xl rounded-[2rem]">
+                     <h3 className="font-black text-xl text-blue-400 mb-8 border-b border-slate-800 pb-4 flex items-center gap-2"><Stethoscope size={22}/> Avaliação Final</h3>
                      <TextArea label="Hipótese" value={formData.hipotese} onChange={(e:any) => setFormData({...formData, hipotese: e.target.value})} placeholder="Ex: Pneumonia comunitária..." required />
                      <TextArea label="Conduta" value={formData.conduta} onChange={(e:any) => setFormData({...formData, conduta: e.target.value})} placeholder="Ex: Antibioticoterapia..." required />
                      <Select label="Status Inicial" value={formData.status} onChange={(e:any) => setFormData({...formData, status: e.target.value})} options={[{value:'Alta', label:'Alta'},{value:'Observação', label:'Observação'},{value:'Aguardando Vaga', label:'Aguardando Vaga'},{value:'Internado', label:'Internado'}]} />
-                     <button type="submit" disabled={loading} className="w-full bg-blue-600 py-5 rounded-3xl font-black text-lg hover:bg-blue-500 shadow-xl transition-all disabled:opacity-50 mt-4 uppercase">CONCLUIR ADMISSÃO</button>
+                     <button type="submit" disabled={loading} className="w-full bg-blue-600 py-5 rounded-3xl font-black text-lg hover:bg-blue-500 shadow-xl transition-all disabled:opacity-50 mt-4 uppercase tracking-widest">CONCLUIR ADMISSÃO</button>
                   </Card>
                </div>
                <div className="lg:col-span-3 space-y-8">
-                  <Card className="p-8 shadow-xl h-full">
-                     <h3 className="font-black text-xl mb-8 flex items-center gap-3 text-emerald-500"><FileText size={24}/> Anamnese Detalhada</h3>
+                  <Card className="p-8 shadow-xl h-full border-0 rounded-[2rem]">
+                     <h3 className="font-black text-xl mb-8 flex items-center gap-3 text-emerald-500 dark:text-emerald-400"><FileText size={24}/> Anamnese e Exame</h3>
                      <TextArea label="Queixa Principal" rows={2} value={formData.queixa} onChange={(e:any) => setFormData({...formData, queixa: e.target.value})} />
-                     <TextArea label="HDA (História Atual)" rows={4} value={formData.hda} onChange={(e:any) => setFormData({...formData, hda: e.target.value})} />
-                     <TextArea label="Exame Físico" rows={4} value={formData.exameFisico} onChange={(e:any) => setFormData({...formData, exameFisico: e.target.value})} />
+                     <TextArea label="HDA (História da Doença Atual)" rows={4} value={formData.hda} onChange={(e:any) => setFormData({...formData, hda: e.target.value})} />
+                     <TextArea label="Exame Físico Detalhado" rows={6} value={formData.exameFisico} onChange={(e:any) => setFormData({...formData, exameFisico: e.target.value})} />
                   </Card>
                </div>
             </div>
@@ -496,43 +554,43 @@ export default function App() {
                   <div className="flex items-center gap-4 mb-3">
                     <h2 className="text-4xl font-black tracking-tighter text-slate-900 dark:text-white leading-tight">{selectedPatient.nome}</h2>
                     <div className="flex gap-2">
-                       <button onClick={openStatusModal} className="p-2.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full hover:scale-110 transition-all"><Edit2 size={20} /></button>
-                       <button onClick={async () => { if(confirm("Apagar paciente permanentemente?")) { await deleteDoc(doc(db, 'artifacts', appId, 'users', user!.uid, 'consultas_medicas', selectedPatient.id)); goBackToList(); } }} className="p-2.5 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full hover:scale-110 transition-all"><Trash2 size={20} /></button>
+                       <button onClick={openStatusModal} className="p-2.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full hover:scale-110 transition-all shadow-sm border border-blue-100 dark:border-blue-900/50"><Edit2 size={20} /></button>
+                       <button onClick={async () => { if(confirm("Apagar prontuário permanentemente?")) { await deleteDoc(doc(db, 'artifacts', appId, 'users', user!.uid, 'consultas_medicas', selectedPatient.id)); goBackToList(); } }} className="p-2.5 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full hover:scale-110 transition-all shadow-sm border border-red-100 dark:border-red-900/50"><Trash2 size={20} /></button>
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-4 text-sm font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest italic">
-                    <span className="bg-slate-100 dark:bg-slate-700 px-3 py-1 rounded-xl text-slate-700 dark:text-slate-300">{selectedPatient.idade} ANOS</span>
+                    <span className="bg-slate-100 dark:bg-slate-700 px-3 py-1 rounded-xl text-slate-700 dark:text-slate-300 font-black">{selectedPatient.idade} ANOS</span>
                     <Badge status={selectedPatient.status} />
-                    <span className="flex items-center gap-2"><Clock size={16} /> ADMISSÃO: {new Date(selectedPatient.createdAt?.seconds! * 1000).toLocaleString('pt-PT')}</span>
+                    <span className="flex items-center gap-2"><Clock size={16} /> ADMITIDO A: {new Date(selectedPatient.createdAt?.seconds! * 1000).toLocaleString('pt-PT')}</span>
                   </div>
                </div>
-               <div className="flex gap-2">
-                  <button onClick={suggestCid} disabled={isCidLoading} className="bg-purple-600 text-white px-6 py-3.5 rounded-2xl font-black text-xs hover:bg-purple-700 flex items-center gap-2 shadow-lg active:scale-95 disabled:opacity-50"><Brain size={18} /> SUGERIR CID</button>
-                  <button onClick={exportPdf} className="bg-slate-900 text-white px-6 py-3.5 rounded-2xl text-xs font-black hover:bg-black flex items-center gap-2 shadow-lg active:scale-95"><FileDown size={18} /> EXPORTAR PDF</button>
+               <div className="flex gap-3">
+                  <button onClick={suggestCid} disabled={isCidLoading} className="bg-purple-600 text-white px-6 py-3.5 rounded-2xl font-black text-xs hover:bg-purple-700 flex items-center gap-2 shadow-lg active:scale-95 disabled:opacity-50"><Brain size={20} /> SUGERIR CID</button>
+                  <button onClick={exportPdf} className="bg-slate-900 text-white px-6 py-4 rounded-2xl text-xs font-black hover:bg-black flex items-center gap-2 shadow-lg active:scale-95"><FileDown size={20} /> EXPORTAR PDF</button>
                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
                <div className="lg:col-span-2 space-y-8">
                   <Card className="p-8 shadow-lg border-0 rounded-[2.5rem]">
-                    <h3 className="font-black text-xl mb-8 flex items-center gap-3 text-red-500 dark:text-red-400"><Activity size={26}/> Tendências Vitais</h3>
+                    <h3 className="font-black text-xl mb-8 flex items-center gap-3 text-red-500 dark:text-red-400"><Activity size={28}/> Tendências Vitais</h3>
                     <div className="grid grid-cols-2 gap-4 mb-8">
-                       <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-700"><span className="text-[9px] font-black text-slate-400 block mb-1 uppercase">P. Arterial</span><span className="font-black text-xl dark:text-slate-200">{selectedPatient.pa}</span></div>
-                       <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-700"><span className="text-[9px] font-black text-slate-400 block mb-1 uppercase">SatO2</span><span className="font-black text-xl dark:text-slate-200">{selectedPatient.sat}%</span></div>
+                       <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-inner"><span className="text-[9px] font-black text-slate-400 dark:text-slate-500 block mb-1 uppercase tracking-widest">P. Arterial</span><span className="font-black text-2xl dark:text-slate-200">{selectedPatient.pa || '-'}</span></div>
+                       <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-inner"><span className="text-[9px] font-black text-slate-400 dark:text-slate-500 block mb-1 uppercase tracking-widest">SatO2</span><span className="font-black text-2xl dark:text-slate-200">{selectedPatient.sat || '-'}%</span></div>
                     </div>
                     {selectedPatient.vitalsHistory && selectedPatient.vitalsHistory.length > 1 && (
                       <div className="space-y-6">
-                         <div className="p-4 bg-blue-50/50 dark:bg-blue-900/10 rounded-2xl flex justify-between items-center"><span className="text-[9px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">Frequência Cardíaca</span><SparkLine data={selectedPatient.vitalsHistory.map(v => parseFloat(v.fc))} color="#3b82f6" /></div>
-                         <div className="p-4 bg-red-50/50 dark:bg-red-900/10 rounded-2xl flex justify-between items-center"><span className="text-[9px] font-black text-red-600 dark:text-red-400 uppercase tracking-widest">Temperatura</span><SparkLine data={selectedPatient.vitalsHistory.map(v => parseFloat(v.temp))} color="#ef4444" /></div>
+                         <div className="p-5 bg-blue-50/50 dark:bg-blue-900/10 rounded-2xl flex justify-between items-center border border-blue-50 dark:border-blue-900/20 shadow-sm"><span className="text-[9px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">Histórico FC</span><SparkLine data={selectedPatient.vitalsHistory.map(v => parseFloat(v.fc))} color="#3b82f6" /></div>
+                         <div className="p-5 bg-red-50/50 dark:bg-red-900/10 rounded-2xl flex justify-between items-center border border-red-50 dark:border-red-900/20 shadow-sm"><span className="text-[9px] font-black text-red-600 dark:text-red-400 uppercase tracking-widest">Histórico Temp</span><SparkLine data={selectedPatient.vitalsHistory.map(v => parseFloat(v.temp))} color="#ef4444" /></div>
                       </div>
                     )}
                   </Card>
                   
-                  <div className="bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl text-slate-400">
-                    <h3 className="font-black text-lg mb-6 flex items-center gap-3 text-blue-400 uppercase tracking-widest"><ShieldCheck size={20}/> Auditoria</h3>
-                    <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                  <div className="bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl border border-slate-800 text-slate-400">
+                    <h3 className="font-black text-lg mb-6 flex items-center gap-3 text-blue-400 uppercase tracking-widest"><ShieldCheck size={22}/> Log de Auditoria</h3>
+                    <div className="space-y-4 max-h-[300px] overflow-y-auto pr-3 custom-scrollbar">
                        {selectedPatient.auditLog?.map((log, i) => (
-                         <div key={i} className="text-[10px] font-medium border-l border-slate-800 pl-3 py-1"><span className="text-slate-600 font-mono block mb-1">{new Date(log.timestamp).toLocaleString()}</span><span className="text-blue-500/80 font-black mr-2 uppercase">{log.action}:</span> {log.details}</div>
+                         <div key={i} className="text-[10px] font-medium border-l-2 border-slate-800 pl-4 py-1 leading-relaxed"><span className="text-slate-600 font-mono block mb-1">{new Date(log.timestamp).toLocaleString('pt-PT')}</span><span className="text-blue-500/80 font-black mr-2 uppercase">{log.action}:</span> {log.details}</div>
                        ))}
                     </div>
                   </div>
@@ -540,27 +598,32 @@ export default function App() {
 
                <div className="lg:col-span-3 space-y-8">
                   <Card className="p-8 shadow-lg border-0 rounded-[2.5rem]">
-                     <h3 className="font-black text-2xl mb-8 border-b border-slate-50 dark:border-slate-700 pb-4 flex items-center gap-3 text-purple-600 dark:text-purple-400"><History size={26}/> Evolução e Histórico</h3>
+                     <h3 className="font-black text-2xl mb-8 border-b border-slate-50 dark:border-slate-700 pb-4 flex items-center gap-3 text-purple-600 dark:text-purple-400"><History size={28}/> Diário e Evoluções</h3>
                      <div className="space-y-6">
+                        {(!selectedPatient.evolutions || selectedPatient.evolutions.length === 0) && (
+                          <div className="py-12 text-center bg-slate-50 dark:bg-slate-900/50 rounded-[2rem] border-2 border-dashed border-slate-100 dark:border-slate-800">
+                             <p className="text-slate-400 font-bold italic">Sem evoluções registadas além da admissão.</p>
+                          </div>
+                        )}
                         {selectedPatient.evolutions?.map((ev, i) => (
-                          <div key={i} className={`p-5 rounded-3xl border shadow-sm relative animate-in fade-in slide-in-from-left-2 ${ev.text.includes('MUDANÇA DE STATUS') ? 'bg-blue-50/30 border-blue-100 dark:bg-blue-900/10 dark:border-blue-800/50' : 'bg-white dark:bg-slate-900/50 border-slate-100 dark:border-slate-700'}`}>
+                          <div key={i} className={`p-6 rounded-3xl border shadow-sm relative animate-in fade-in slide-in-from-left-2 transition-all ${ev.text.includes('MUDANÇA DE STATUS') ? 'bg-blue-50/40 border-blue-100 dark:bg-blue-900/10 dark:border-blue-900/50' : 'bg-white dark:bg-slate-900/50 border-slate-100 dark:border-slate-700'}`}>
                              <div className="text-[10px] font-black text-slate-300 dark:text-slate-500 mb-3 uppercase tracking-widest flex justify-between"><span>{new Date(ev.createdAt).toLocaleString('pt-PT')}</span><span className="opacity-40">DR. {user.email?.split('@')[0]}</span></div>
                              <p className="text-slate-700 dark:text-slate-300 font-bold leading-relaxed whitespace-pre-wrap">{ev.text}</p>
                           </div>
                         ))}
                         {selectedPatient.status !== 'Alta' && (
-                          <div className="flex flex-col gap-3 pt-6 animate-in slide-in-from-bottom-4">
+                          <div className="flex flex-col gap-4 pt-8 animate-in slide-in-from-bottom-4">
                              <div className="relative">
-                               <textarea value={evolutionText} onChange={(e) => setEvolutionText(e.target.value)} placeholder="Registe a evolução, novos sinais vitais ou conduta..." className="w-full p-6 rounded-[2rem] border-2 border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/20 outline-none min-h-[160px] dark:text-white transition-all font-medium" />
+                               <textarea value={evolutionText} onChange={(e) => setEvolutionText(e.target.value)} placeholder="Registe a evolução clínica..." className="w-full p-8 rounded-[2.5rem] border-2 border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/20 outline-none min-h-[180px] dark:text-white transition-all font-medium shadow-inner" />
                                <button onClick={async () => {
                                  if(!evolutionText.trim()) return;
                                  setLoading(true);
                                  try {
                                    const pRef = doc(db, 'artifacts', appId, 'users', user.uid, 'consultas_medicas', selectedPatient.id);
                                    await updateDoc(pRef, { evolutions: arrayUnion({ text: evolutionText, createdAt: new Date().toISOString(), createdBy: user.uid }) });
-                                   setEvolutionText(''); showNotification("Evoluído com sucesso!");
-                                 } catch(e) { showNotification("Erro", "error"); } finally { setLoading(false); }
-                               }} disabled={loading || !evolutionText.trim()} className="absolute bottom-4 right-4 bg-blue-600 text-white p-4 rounded-2xl hover:bg-blue-700 shadow-xl active:scale-90 transition-all disabled:opacity-50"><Send size={24} /></button>
+                                   setEvolutionText(''); showNotification("Evolução guardada!");
+                                 } catch(e) { showNotification("Erro ao guardar", "error"); } finally { setLoading(false); }
+                               }} disabled={loading || !evolutionText.trim()} className="absolute bottom-6 right-6 bg-blue-600 text-white p-5 rounded-3xl hover:bg-blue-700 shadow-xl active:scale-90 transition-all disabled:opacity-50"><Send size={32} /></button>
                              </div>
                           </div>
                         )}
