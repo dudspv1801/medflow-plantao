@@ -21,10 +21,8 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import {
-  Clipboard,
   PlusCircle,
   Users,
-  Save,
   Activity,
   CheckCircle,
   Clock,
@@ -38,10 +36,7 @@ import {
   MessageSquare,
   Send,
   History,
-  Smartphone,
-  Share,
   X,
-  ChevronRight,
   Filter,
   Sun,
   Moon,
@@ -179,7 +174,12 @@ export default function App() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof localStorage !== 'undefined') {
+      return localStorage.getItem('theme') === 'dark';
+    }
+    return false;
+  });
   const [evolutionText, setEvolutionText] = useState('');
   const [showDischarged, setShowDischarged] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
@@ -224,7 +224,7 @@ export default function App() {
       setUser(u);
     });
     return () => unsubscribe();
-  }, []);
+  }, [loading]);
 
   // Theme
   useEffect(() => {
@@ -241,7 +241,6 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
 
-    // RULE 1: Caminho privado por usuário
     const q = collection(db, 'artifacts', appId, 'users', user.uid, 'consultas_medicas');
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -269,6 +268,29 @@ export default function App() {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleCopyToClipboard = () => {
+    const vitals = `PA: ${formData.pa || '-'} | FC: ${formData.fc || '-'} | Sat: ${formData.sat || '-'} | Temp: ${formData.temp || '-'}`;
+    let text = `PACIENTE: ${formData.nome} (${formData.idade} anos)\n\n`;
+    text += `QUEIXA:\n${formData.queixa}\n\n`;
+    text += `HDA:\n${formData.hda}\n\n`;
+    text += `EXAME FÍSICO:\n${vitals}\n${formData.exameFisico}\n\n`;
+    text += `HD: ${formData.hipotese}\n`;
+    text += `CONDUTA: ${formData.conduta}\n`;
+    text += `DESFECHO: ${formData.status}`;
+    
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+      document.execCommand('copy');
+      showNotification('Prontuário copiado!');
+    } catch (err) {
+      showNotification('Erro ao copiar texto', 'error');
+    }
+    document.body.removeChild(textArea);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -593,7 +615,7 @@ export default function App() {
               </Card>
 
               <div className="flex justify-end gap-4">
-                <button type="button" onClick={copyToClipboard} className="px-6 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded-xl font-bold transition-all">Copiar Texto</button>
+                <button type="button" onClick={handleCopyToClipboard} className="px-6 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded-xl font-bold transition-all">Copiar Texto</button>
                 <button type="submit" disabled={loading} className="px-10 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg disabled:opacity-50">
                   {loading ? 'Salvando...' : 'Salvar Atendimento'}
                 </button>
@@ -743,12 +765,3 @@ export default function App() {
     </div>
   );
 }
-
-const copyToClipboard = (text: string) => {
-  const textArea = document.createElement('textarea');
-  textArea.value = text;
-  document.body.appendChild(textArea);
-  textArea.select();
-  document.execCommand('copy');
-  document.body.removeChild(textArea);
-};
