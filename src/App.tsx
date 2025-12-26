@@ -23,8 +23,8 @@ import {
 import { 
   PlusCircle, Users, Activity, Clock, FileText, 
   LogOut, Stethoscope, ArrowLeft, Send, History, 
-  Share, X, ChevronRight, Filter, Sun, Moon, Edit2, Trash2, Search, 
-  Brain, Lock, FileDown, ShieldCheck
+  Share, X, ChevronRight, Sun, Moon, Edit2, Trash2, Search, 
+  Brain, Lock, FileDown, ShieldCheck, Smartphone
 } from 'lucide-react';
 
 // --- CONFIGURAÇÃO FIREBASE ---
@@ -445,7 +445,7 @@ export default function App() {
              <button onClick={() => setShowInstallModal(true)} className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 transition-all shadow-sm">
                 <Smartphone size={20} />
              </button>
-             {view === 'list' && <button onClick={() => setView('form')} className="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 hover:bg-blue-700 shadow-lg active:scale-95 transition-all"><PlusCircle size={16} /> <span className="hidden sm:inline uppercase tracking-widest">ADMITIR</span></button>}
+             {view === 'list' && <button onClick={() => setView('form')} className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-black flex items-center gap-2 hover:bg-blue-700 shadow-lg active:scale-95 transition-all"><PlusCircle size={16} /> <span className="hidden sm:inline uppercase tracking-widest">ADMITIR</span></button>}
              {view !== 'list' && <button onClick={goBackToList} className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 transition-all shadow-sm"><ArrowLeft size={20} /></button>}
              <button onClick={() => signOut(auth)} className="p-2 text-slate-400 hover:text-red-500 transition-colors ml-1"><LogOut size={22} /></button>
           </div>
@@ -460,7 +460,7 @@ export default function App() {
 
       {/* MODAL STATUS */}
       {isStatusModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white dark:bg-slate-800 rounded-[2.5rem] w-full max-w-md shadow-2xl p-8 animate-in zoom-in-95 duration-200">
             <h3 className="font-black text-xl mb-6 flex items-center gap-3 dark:text-white"><Edit2 size={24} className="text-blue-500" /> Atualizar Status</h3>
             <div className="space-y-6">
@@ -496,7 +496,7 @@ export default function App() {
                     <div className="flex items-center justify-between border-t border-slate-50 dark:border-slate-700/50 pt-4">
                         <div className="flex gap-4"><div className="text-center"><span className="text-[8px] font-black text-slate-300 block uppercase">PA</span><span className="text-xs font-black dark:text-slate-300">{p.pa}</span></div><div className="text-center"><span className="text-[8px] font-black text-slate-300 block uppercase">SAT</span><span className="text-xs font-black dark:text-slate-300">{p.sat}%</span></div></div>
                         {p.vitalsHistory && p.vitalsHistory.length > 1 && <SparkLine data={p.vitalsHistory.map(v => parseFloat(v.fc))} color="#3b82f6" />}
-                        <ChevronRight className="text-slate-300 group-hover:text-blue-500 transition-colors" size={20} />
+                        <ChevronRight className="text-slate-300 group-hover:text-blue-500 transition-colors" size={24} />
                     </div>
                   </Card>
                 ))}
@@ -528,9 +528,9 @@ export default function App() {
                   </Card>
                   <Card className="p-8 bg-slate-900 dark:bg-black text-white border-0 shadow-2xl rounded-[2rem]">
                      <h3 className="font-black text-xl text-blue-400 mb-8 border-b border-slate-800 pb-4 flex items-center gap-2"><Stethoscope size={22}/> Avaliação Final</h3>
-                     <TextArea label="Hipótese" value={formData.hipotese} onChange={(e:any) => setFormData({...formData, hipotese: e.target.value})} placeholder="Ex: Pneumonia comunitária..." required />
-                     <TextArea label="Conduta" value={formData.conduta} onChange={(e:any) => setFormData({...formData, conduta: e.target.value})} placeholder="Ex: Antibioticoterapia..." required />
-                     <Select label="Status Inicial" value={formData.status} onChange={(e:any) => setFormData({...formData, status: e.target.value})} options={[{value:'Alta', label:'Alta'},{value:'Observação', label:'Observação'},{value:'Aguardando Vaga', label:'Aguardando Vaga'},{value:'Internado', label:'Internado'}]} />
+                     <TextArea label="Hipótese Diagnóstica" value={formData.hipotese} onChange={(e:any) => setFormData({...formData, hipotese: e.target.value})} placeholder="Ex: Pneumonia comunitária..." required />
+                     <TextArea label="Conduta Proposta" value={formData.conduta} onChange={(e:any) => setFormData({...formData, conduta: e.target.value})} placeholder="Ex: Antibioticoterapia..." required />
+                     <Select label="Status Inicial" value={formData.status} onChange={(e:any) => setFormData({...formData, status: e.target.value})} options={[{value:'Alta', label:'Alta'},{value:'Observação', label:'Em Observação'},{value:'Aguardando Vaga', label:'Aguardando Vaga'},{value:'Internado', label:'Internado'},{value:'Transferido', label:'Transferido'}]} />
                      <button type="submit" disabled={loading} className="w-full bg-blue-600 py-5 rounded-3xl font-black text-lg hover:bg-blue-500 shadow-xl transition-all disabled:opacity-50 mt-4 uppercase tracking-widest">CONCLUIR ADMISSÃO</button>
                   </Card>
                </div>
@@ -565,7 +565,7 @@ export default function App() {
                   </div>
                </div>
                <div className="flex gap-3">
-                  <button onClick={suggestCid} disabled={isCidLoading} className="bg-purple-600 text-white px-6 py-3.5 rounded-2xl font-black text-xs hover:bg-purple-700 flex items-center gap-2 shadow-lg active:scale-95 disabled:opacity-50"><Brain size={20} /> SUGERIR CID</button>
+                  <button onClick={suggestCid} disabled={isCidLoading} className="bg-purple-600 text-white px-6 py-4 rounded-2xl font-black text-xs hover:bg-purple-700 flex items-center gap-2 shadow-lg active:scale-95 disabled:opacity-50"><Brain size={20} /> SUGERIR CID</button>
                   <button onClick={exportPdf} className="bg-slate-900 text-white px-6 py-4 rounded-2xl text-xs font-black hover:bg-black flex items-center gap-2 shadow-lg active:scale-95"><FileDown size={20} /> EXPORTAR PDF</button>
                </div>
             </div>
@@ -573,7 +573,7 @@ export default function App() {
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
                <div className="lg:col-span-2 space-y-8">
                   <Card className="p-8 shadow-lg border-0 rounded-[2.5rem]">
-                    <h3 className="font-black text-xl mb-8 flex items-center gap-3 text-red-500 dark:text-red-400"><Activity size={28}/> Tendências Vitais</h3>
+                    <h3 className="font-black text-2xl mb-8 flex items-center gap-3 text-red-500 dark:text-red-400"><Activity size={28}/> Tendências Vitais</h3>
                     <div className="grid grid-cols-2 gap-4 mb-8">
                        <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-inner"><span className="text-[9px] font-black text-slate-400 dark:text-slate-500 block mb-1 uppercase tracking-widest">P. Arterial</span><span className="font-black text-2xl dark:text-slate-200">{selectedPatient.pa || '-'}</span></div>
                        <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-inner"><span className="text-[9px] font-black text-slate-400 dark:text-slate-500 block mb-1 uppercase tracking-widest">SatO2</span><span className="font-black text-2xl dark:text-slate-200">{selectedPatient.sat || '-'}%</span></div>
