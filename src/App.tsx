@@ -337,49 +337,6 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  // THEME: improved dark mode (persistent + respects system preference)
-  const getInitialTheme = (): 'light' | 'dark' => {
-    try {
-      const saved = localStorage.getItem('theme');
-      if (saved === 'dark' || saved === 'light') return saved;
-      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        return 'dark';
-      }
-    } catch (e) {
-      // ignore
-    }
-    return 'light';
-  };
-
-  const [theme, setTheme] = useState<'light' | 'dark'>(() =>
-    typeof window === 'undefined' ? 'light' : getInitialTheme()
-  );
-
-  useEffect(() => {
-    // Apply/remove the `dark` class (tailwind dark variant depends on this)
-    document.documentElement.classList.toggle('dark', theme === 'dark');
-
-    // Persist preference
-    try {
-      localStorage.setItem('theme', theme);
-    } catch (e) {
-      // ignore
-    }
-
-    // Update theme-color meta for mobile address bar
-    let metaThemeColor = document.querySelector('meta[name=theme-color]');
-    if (!metaThemeColor) {
-      metaThemeColor = document.createElement('meta');
-      metaThemeColor.setAttribute('name', 'theme-color');
-      document.head.appendChild(metaThemeColor);
-    }
-    metaThemeColor.setAttribute('content', theme === 'dark' ? '#0f172a' : '#2563eb');
-  }, [theme]);
-
-  const toggleTheme = () => {
-    setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
-  };
-
   const [view, setView] = useState<'list' | 'form' | 'details'>('list');
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [loading, setLoading] = useState(false);
@@ -421,6 +378,15 @@ export default function App() {
         'https://cdn-icons-png.flaticon.com/512/3063/3063176.png';
       document.head.appendChild(linkApple);
     }
+
+    // define a cor do tema para navegadores móveis (fixa para a versão sem dark mode)
+    let metaThemeColor = document.querySelector('meta[name=theme-color]');
+    if (!metaThemeColor) {
+      metaThemeColor = document.createElement('meta');
+      metaThemeColor.setAttribute('name', 'theme-color');
+      document.head.appendChild(metaThemeColor);
+    }
+    metaThemeColor.setAttribute('content', '#2563eb');
   }, []);
 
   const initialFormState = {
@@ -756,7 +722,7 @@ export default function App() {
           <button
             onClick={handleGoogleLogin}
             disabled={authLoading}
-            className="w-full bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-slate-400 font-medium py-3 px-4 rounded-lg flex items-center justify-center gap-3 transition-colors"
+            className="w-full bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-slate-400 font-medium py-3 px-4 rounded-lg flex items-center justify-center gap-3 transitio[...]
           >
             {authLoading ? (
               <span className="w-5 h-5 border-2 border-slate-300 border-t-blue-600 rounded-full animate-spin" />
@@ -898,21 +864,6 @@ export default function App() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2 sm:gap-4 px-6">
-              {/* Botão Theme (novo) */}
-              <button
-                onClick={toggleTheme}
-                className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-slate-600 dark:text-yellow-400"
-                title={theme === 'dark' ? 'Ativar Modo Claro' : 'Ativar Modo Escuro'}
-              >
-                {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
-              </button>
-
-              <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
-              
-              {/* Espaço reservado para outros botões se necessário */}
-            </div>
-
             <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-2">
               <button
                 onClick={() => setIsStatusModalOpen(false)}
@@ -1027,7 +978,7 @@ export default function App() {
                     <button
                       type="submit"
                       disabled={loading}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-medium flex items-center gap-2 shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-medium flex items-center gap-2 shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-al[...]
                     >
                       {loading ? (
                         'Salvando...'
@@ -1156,7 +1107,7 @@ export default function App() {
                     <button
                       onClick={handleAddEvolution}
                       disabled={loading || !evolutionText.trim()}
-                      className="w-full bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:curs[...]
                     >
                       {loading ? 'Salvando...' : (<><Send size={16} /> Salvar Evolução</>)}
                     </button>
@@ -1227,7 +1178,7 @@ export default function App() {
           placeholder="Pesquisar por nome do paciente..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-10 pr-10 py-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-colors"
+          className="w-full pl-10 pr-10 py-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transitio[...]
         />
         {searchTerm && (
           <button 
