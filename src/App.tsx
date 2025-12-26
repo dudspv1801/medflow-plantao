@@ -23,11 +23,11 @@ import {
   Timestamp
 } from 'firebase/firestore';
 import { 
-  PlusCircle, Users, Activity, Clock, FileText, 
+  PlusCircle, Users, Activity, Clock, 
   LogOut, Stethoscope, ArrowLeft, Send, History, 
   ChevronRight, Sun, Moon, Edit2, Trash2, Search, 
-  Brain, Lock, FileDown, ShieldCheck, Smartphone,
-  CheckCircle, BedDouble, Ambulance, Clipboard, Save, Filter, X, Share
+  Brain, Lock, FileDown, ShieldCheck, 
+  CheckCircle, BedDouble, Ambulance, Clipboard, Save
 } from 'lucide-react';
 
 // --- CONFIGURAÇÃO FIREBASE ---
@@ -418,7 +418,7 @@ export default function App() {
 
       {/* MODAL STATUS ULTRA */}
       {isStatusModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white dark:bg-slate-800 rounded-[3.5rem] w-full max-w-md shadow-2xl p-10 border border-slate-100 dark:border-slate-700">
             <h3 className="font-black text-3xl mb-8 flex items-center gap-4 dark:text-white tracking-tighter uppercase"><Edit2 size={30} className="text-blue-500" /> Status</h3>
             <div className="space-y-6">
@@ -437,7 +437,7 @@ export default function App() {
           <div className="space-y-12">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-8">
               <div><h2 className="text-5xl font-black tracking-tighter dark:text-white leading-tight uppercase">Censo Privado</h2><p className="text-slate-400 dark:text-slate-500 font-black uppercase tracking-[0.3em] text-[10px] mt-2 opacity-70 italic">{user.email}</p></div>
-              <button onClick={() => setShowDischarged(!showDischarged)} className={`px-8 py-4 rounded-[2rem] text-[10px] font-black uppercase tracking-[0.2em] transition-all border-2 shadow-sm ${showDischarged ? 'bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-white border-transparent' : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-100 dark:border-slate-700 hover:border-blue-200'}`}>{showDischarged ? 'OCULTAR ALTAS' : 'MOSTRAR ALTAS'}</button>
+              <button onClick={() => setShowDischarged(!showDischarged)} className="px-8 py-4 rounded-[2rem] text-[10px] font-black uppercase tracking-[0.2em] transition-all border-2 shadow-sm bg-white dark:bg-slate-800 text-slate-500 border-slate-100 dark:border-slate-700 hover:border-blue-200">{showDischarged ? 'OCULTAR ALTAS' : 'MOSTRAR ALTAS'}</button>
             </div>
 
             {filteredPatients.length === 0 ? (
@@ -493,7 +493,7 @@ export default function App() {
                      <h3 className="font-black text-3xl text-blue-400 mb-12 border-b border-slate-800 pb-6 flex items-center gap-4 tracking-tighter uppercase"><Stethoscope size={32}/> Diagnóstico</h3>
                      <TextArea label="Hipótese Diagnóstica" value={formData.hipotese} onChange={(e:any) => setFormData({...formData, hipotese: e.target.value})} placeholder="Descreva o quadro..." required />
                      <TextArea label="Conduta Inicial" value={formData.conduta} onChange={(e:any) => setFormData({...formData, conduta: e.target.value})} placeholder="Plano terapêutico..." required />
-                     <div className="mb-12 ml-1"><Label>Destino</Label><select className="w-full p-6 rounded-[2rem] bg-slate-950 border-2 border-slate-800 text-white font-black outline-none focus:border-blue-500 transition-all cursor-pointer" value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})}>
+                     <div className="mb-12 ml-1"><Label>Destino</Label><select className="w-full p-6 rounded-[2rem] bg-slate-950 border-2 border-slate-800 text-white font-black outline-none focus:border-blue-500 transition-all cursor-pointer" value={formData.status} onChange={(e:any) => setFormData({...formData, status: e.target.value})}>
                         <option value="Alta">Alta Médica</option><option value="Observação">Observação</option><option value="Aguardando Vaga">Vaga</option><option value="Internado">Internado</option>
                      </select></div>
                      <button type="submit" disabled={loading} className="w-full bg-blue-600 py-7 rounded-[2.5rem] font-black text-2xl hover:bg-blue-500 shadow-2xl shadow-blue-500/40 transition-all active:scale-95 disabled:opacity-50 uppercase tracking-widest"><Save size={28} className="inline mr-3 mb-1"/> FINALIZAR REGISTO</button>
@@ -526,11 +526,11 @@ export default function App() {
                   <div className="flex flex-wrap gap-8 text-sm font-black text-slate-500 dark:text-slate-400 uppercase tracking-[0.3em] italic opacity-80">
                     <span className="bg-slate-100 dark:bg-slate-700 px-6 py-2.5 rounded-[1.5rem] text-slate-800 dark:text-slate-200 shadow-inner">{selectedPatient.idade} ANOS</span>
                     <Badge status={selectedPatient.status} />
-                    <span className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800/50 px-6 py-2.5 rounded-[1.5rem]"><Clock size={20} className="text-blue-500"/> ADMISSÃO: {new Date(selectedPatient.createdAt?.seconds! * 1000).toLocaleString('pt-PT', {day:'2-digit', month:'long', hour:'2-digit', minute:'2-digit'})}</span>
+                    <span className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800/50 px-6 py-2.5 rounded-[1.5rem]"><Clock size={20} className="text-blue-500"/> ADMITIDO: {new Date(selectedPatient.createdAt?.seconds! * 1000).toLocaleString('pt-PT', {day:'2-digit', month:'long', hour:'2-digit', minute:'2-digit'})}</span>
                   </div>
                </div>
                <div className="flex gap-5">
-                  <button onClick={suggestCid} disabled={isCidLoading} className="bg-purple-600 text-white px-10 py-6 rounded-[2.5rem] font-black text-xs hover:bg-purple-700 flex items-center gap-4 shadow-2xl shadow-purple-500/30 active:scale-95 transition-all uppercase tracking-widest"><Brain size={26} /> INTELIGÊNCIA IA</button>
+                  <button onClick={suggestCid} disabled={isCidLoading} className="bg-purple-600 text-white px-10 py-6 rounded-[2.5rem] font-black text-xs hover:bg-purple-700 flex items-center gap-4 shadow-2xl shadow-purple-500/30 active:scale-95 disabled:opacity-50 transition-all uppercase tracking-widest"><Brain size={26} /> INTELIGÊNCIA IA</button>
                   <button onClick={exportPdf} className="bg-slate-900 text-white px-10 py-6 rounded-[2.5rem] font-black text-xs hover:bg-black flex items-center gap-4 shadow-2xl shadow-black/30 active:scale-95 transition-all uppercase tracking-widest"><FileDown size={26} /> PDF</button>
                </div>
             </div>
@@ -546,7 +546,7 @@ export default function App() {
                     {selectedPatient.vitalsHistory && selectedPatient.vitalsHistory.length > 1 && (
                       <div className="space-y-8 animate-premium">
                          <div className="p-8 bg-blue-50/50 dark:bg-blue-900/10 rounded-[3rem] flex justify-between items-center border border-blue-50 dark:border-blue-900/20 shadow-sm"><span className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest leading-none">Histórico FC</span><SparkLine data={selectedPatient.vitalsHistory.map(v => parseFloat(v.fc))} color="#3b82f6" /></div>
-                         <div className="p-8 bg-red-50/50 dark:bg-red-900/10 rounded-[3rem] flex justify-between items-center border border-red-50 dark:border-red-900/20 shadow-sm"><span className="text-[10px] font-black text-red-600 dark:text-red-400 uppercase tracking-widest leading-none">Histórico Temp</span><SparkLine data={selectedPatient.vitalsHistory.map(v => parseFloat(v.temp))} color="#ef4444" /></div>
+                         <div className="p-8 bg-red-50/50 dark:bg-red-900/10 rounded-[3rem] flex justify-between items-center border border-red-50 dark:border-red-900/20 shadow-sm"><span className="text-[10px] font-black text-red-600 dark:text-red-400 uppercase tracking-widest font-black leading-none">Histórico Temp</span><SparkLine data={selectedPatient.vitalsHistory.map(v => parseFloat(v.temp))} color="#ef4444" /></div>
                       </div>
                     )}
                   </Card>
