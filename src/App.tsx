@@ -269,9 +269,7 @@ const InstallModal: React.FC<{ onClose: () => void }> = ({ onClose }) => (
 
         <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
           <h4 className="font-bold text-slate-800 mb-2 flex items-center gap-2">
-            <span className="bg-black text-white text-xs px-1.5 py-0.5 rounded">
-              iOS
-            </span>{' '}
+            <span className="bg-black text-white text-xs px-1.5 py-0.5 rounded">iOS</span>{' '}
             iPhone/iPad
           </h4>
           <ol className="text-sm text-slate-600 space-y-2 list-decimal list-inside">
@@ -283,44 +281,35 @@ const InstallModal: React.FC<{ onClose: () => void }> = ({ onClose }) => (
               .
             </li>
             <li>
-              Role para baixo e toque em{' '}
-              <span className="font-bold">Adicionar à Tela de Início</span>.
+              Role para baixo e toque em <span className="font-bold">Adicionar à Tela de Início</span>.
             </li>
             <li>
-              Toque em{' '}
-              <span className="font-bold text-blue-600">Adicionar</span>.
+              Toque em <span className="font-bold text-blue-600">Adicionar</span>.
             </li>
           </ol>
         </div>
 
         <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
           <h4 className="font-bold text-slate-800 mb-2 flex items-center gap-2">
-            <span className="bg-green-600 text-white text-xs px-1.5 py-0.5 rounded">
-              Android
-            </span>{' '}
+            <span className="bg-green-600 text-white text-xs px-1.5 py-0.5 rounded">Android</span>{' '}
             Chrome
           </h4>
           <ol className="text-sm text-slate-600 space-y-2 list-decimal list-inside">
             <li>
-              Toque nos <span className="font-bold">três pontinhos (⋮)</span> no
-              canto superior.
+              Toque nos <span className="font-bold">três pontinhos (⋮)</span> no canto superior.
             </li>
             <li>
-              Toque em{' '}
-              <span className="font-bold">Adicionar à tela inicial</span>.
+              Toque em <span className="font-bold">Adicionar à tela inicial</span>.
             </li>
             <li>
-              Confirme tocando em{' '}
-              <span className="font-bold text-blue-600">Adicionar</span>.
+              Confirme tocando em <span className="font-bold text-blue-600">Adicionar</span>.
             </li>
           </ol>
         </div>
 
         <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
           <h4 className="font-bold text-slate-800 mb-2 flex items-center gap-2">
-            <span className="bg-indigo-600 text-white text-xs px-1.5 py-0.5 rounded">
-              PC
-            </span>{' '}
+            <span className="bg-indigo-600 text-white text-xs px-1.5 py-0.5 rounded">PC</span>{' '}
             Chrome/Edge
           </h4>
           <p className="text-sm text-slate-600">
@@ -784,6 +773,8 @@ export default function App() {
       </div>
     );
 
+  const groups = getGroupedPatients();
+
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800 pb-20 w-full">
       <header className="bg-white shadow-sm sticky top-0 z-10 border-b border-slate-200 w-full">
@@ -1236,7 +1227,7 @@ export default function App() {
           placeholder="Pesquisar por nome do paciente..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-10 pr-10 py-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm"
+          className="w-full pl-10 pr-10 py-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-colors"
         />
         {searchTerm && (
           <button 
@@ -1250,135 +1241,132 @@ export default function App() {
     </div>
 
     {/* LISTAGEM - Onde o resultado da busca aparece */}
-    {getFilteredAndGroupedPatients().length === 0 ? (
-      <div className="text-center py-20 bg-white dark:bg-slate-800 rounded-xl border border-dashed border-slate-300 dark:border-slate-700">
-        <p className="text-slate-400">Nenhum paciente encontrado.</p>
-        {searchTerm && (
-          <button
-            onClick={() => setSearchTerm('')}
-            className="text-blue-500 font-medium mt-2 hover:underline"
-          >
-            Limpar pesquisa
-          </button>
-        )}
-      </div>
-    )
+    {groups.length === 0 ? (
+      patients.length === 0 ? (
+        <div className="text-center py-20 bg-white rounded-xl border border-dashed border-slate-300">
+          <p className="text-slate-400">Nenhum atendimento registrado ainda.</p>
+          <button onClick={() => setView('form')} className="text-blue-500 font-medium mt-2 hover:underline">Começar atendimento</button>
+        </div>
+      ) : (
+        <div className="text-center py-20 bg-white dark:bg-slate-800 rounded-xl border border-dashed border-slate-300 dark:border-slate-700">
+          <p className="text-slate-400">Nenhum paciente encontrado.</p>
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className="text-blue-500 font-medium mt-2 hover:underline"
+            >
+              Limpar pesquisa
+            </button>
+          )}
+        </div>
+      )
+    ) : (
       <div className="space-y-8">
-        {/* Aqui continua o seu .map anterior que exibe os grupos de plantão */}
+        {groups.map(([shiftLabel, { info, patients: groupPatients }]) => (
+          <div key={shiftLabel} className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <div className={`flex items-center gap-2 mb-3 px-1 border-l-4 pl-3 ${info.isNight ? 'border-indigo-500' : 'border-orange-500'}`}>
+              <div className={`p-1.5 rounded-md ${info.isNight ? 'bg-indigo-100 text-indigo-600' : 'bg-orange-100 text-orange-600'}`}>
+                {info.icon}
+              </div>
+              <h3 className="font-bold text-slate-700 text-lg">{shiftLabel}</h3>
+              <span className="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-medium">{groupPatients.length}</span>
             </div>
 
-            {patients.length === 0 ? (
-              <div className="text-center py-20 bg-white rounded-xl border border-dashed border-slate-300">
-                <p className="text-slate-400">Nenhum atendimento registrado ainda.</p>
-                <button onClick={() => setView('form')} className="text-blue-500 font-medium mt-2 hover:underline">Começar atendimento</button>
-              </div>
-            ) : (
-              <div className="space-y-8">
-                {getGroupedPatients().map(([shiftLabel, { info, patients: groupPatients }]) => (
-                  <div key={shiftLabel} className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-                    <div className={`flex items-center gap-2 mb-3 px-1 border-l-4 pl-3 ${info.isNight ? 'border-indigo-500' : 'border-orange-500'}`}>
-                      <div className={`p-1.5 rounded-md ${info.isNight ? 'bg-indigo-100 text-indigo-600' : 'bg-orange-100 text-orange-600'}`}>
-                        {info.icon}
-                      </div>
-                      <h3 className="font-bold text-slate-700 text-lg">{shiftLabel}</h3>
-                      <span className="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-medium">{groupPatients.length}</span>
-                    </div>
-
-                    <div className="hidden md:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-6">
-                      <table className="w-full text-left border-collapse">
-                        <thead>
-                          <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                            <th className="p-4 font-semibold text-slate-600">Paciente</th>
-                            <th className="p-4 font-semibold text-slate-600">Hipótese / Conduta</th>
-                            <th className="p-4 font-semibold text-slate-600">Status</th>
-                            <th className="p-4 font-semibold text-slate-600">Admissão</th>
-                            <th className="p-4 font-semibold text-slate-600 text-right">Ações</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {groupPatients.map((patient) => (
-                            <tr key={patient.id} onClick={() => openPatientDetails(patient)} className="hover:bg-blue-50 cursor-pointer transition-colors group">
-                              <td className="p-4 align-top">
-                                <div className="font-bold text-slate-800">{patient.nome}</div>
-                                <div className="text-sm text-slate-500">{patient.idade} anos</div>
-                              </td>
-                              <td className="p-4 align-top max-w-xs">
-                                <div className="font-medium text-slate-700 mb-1">{patient.hipotese}</div>
-                                <div className="text-xs text-slate-500 line-clamp-1">{patient.conduta}</div>
-                              </td>
-                              <td className="p-4 align-top">
-                                <Badge status={patient.status} />
-                                {patient.evolutions && patient.evolutions.length > 0 && (
-                                  <div className="mt-1 flex items-center gap-1 text-xs text-purple-600">
-                                    <MessageSquare size={12} /> {patient.evolutions.length}
-                                  </div>
-                                )}
-                              </td>
-                              <td className="p-4 align-top text-sm text-slate-500">
-                                {patient.createdAt ? new Date(patient.createdAt.seconds * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '-'}
-                              </td>
-                              <td className="p-4 align-top text-right">
-                                <ChevronRight size={20} className="ml-auto text-slate-400 group-hover:text-blue-600" />
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-4 md:hidden">
-                      {groupPatients.map((patient) => (
-                        <Card key={patient.id} onClick={() => openPatientDetails(patient)} className="hover:border-blue-300">
-                          <div className="p-4 sm:p-5">
-                            <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-4 mb-3">
-                              <div>
-                                <div className="flex items-center gap-2 mb-1">
-                                  <h3 className="font-bold text-lg text-slate-800 hover:text-blue-600 transition-colors">{patient.nome}</h3>
-                                  <span className="text-slate-500 text-sm">({patient.idade} anos)</span>
-                                </div>
-                                <p className="text-sm font-medium text-slate-600 mb-1">{patient.hipotese}</p>
-                                <p className="text-xs text-slate-400">
-                                  Admitido em: {patient.createdAt ? new Date(patient.createdAt.seconds * 1000).toLocaleString('pt-BR') : 'Agora'}
-                                </p>
-                              </div>
-                              <div className="flex flex-col items-end gap-2">
-                                <Badge status={patient.status} />
-                                {patient.evolutions && patient.evolutions.length > 0 && (
-                                  <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded border border-purple-100 flex items-center gap-1">
-                                    <MessageSquare size={10} /> {patient.evolutions.length} evoluções
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-
-                            <div className="bg-slate-50 rounded-lg p-3 text-sm text-slate-700 border border-slate-100">
-                              <div className="grid sm:grid-cols-2 gap-x-4 gap-y-2">
-                                <div>
-                                  <span className="font-semibold text-xs text-slate-500 uppercase block mb-1">Conduta Inicial</span>
-                                  <span className="line-clamp-2">{patient.conduta}</span>
-                                </div>
-                                {(patient.pendencias || patient.motivoInternacao) && (
-                                  <div className="sm:border-l sm:border-slate-200 sm:pl-4 mt-2 sm:mt-0">
-                                    {patient.pendencias && (
-                                      <div className="mb-2">
-                                        <span className="font-semibold text-xs text-orange-500 uppercase block mb-1">Pendências</span>
-                                        <span className="line-clamp-1">{patient.pendencias}</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
+            <div className="hidden md:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-6">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    <th className="p-4 font-semibold text-slate-600">Paciente</th>
+                    <th className="p-4 font-semibold text-slate-600">Hipótese / Conduta</th>
+                    <th className="p-4 font-semibold text-slate-600">Status</th>
+                    <th className="p-4 font-semibold text-slate-600">Admissão</th>
+                    <th className="p-4 font-semibold text-slate-600 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {groupPatients.map((patient) => (
+                    <tr key={patient.id} onClick={() => openPatientDetails(patient)} className="hover:bg-blue-50 cursor-pointer transition-colors group">
+                      <td className="p-4 align-top">
+                        <div className="font-bold text-slate-800">{patient.nome}</div>
+                        <div className="text-sm text-slate-500">{patient.idade} anos</div>
+                      </td>
+                      <td className="p-4 align-top max-w-xs">
+                        <div className="font-medium text-slate-700 mb-1">{patient.hipotese}</div>
+                        <div className="text-xs text-slate-500 line-clamp-1">{patient.conduta}</div>
+                      </td>
+                      <td className="p-4 align-top">
+                        <Badge status={patient.status} />
+                        {patient.evolutions && patient.evolutions.length > 0 && (
+                          <div className="mt-1 flex items-center gap-1 text-xs text-purple-600">
+                            <MessageSquare size={12} /> {patient.evolutions.length}
                           </div>
-                        </Card>
-                      ))}
+                        )}
+                      </td>
+                      <td className="p-4 align-top text-sm text-slate-500">
+                        {patient.createdAt ? new Date(patient.createdAt.seconds * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '-'}
+                      </td>
+                      <td className="p-4 align-top text-right">
+                        <ChevronRight size={20} className="ml-auto text-slate-400 group-hover:text-blue-600" />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:hidden">
+              {groupPatients.map((patient) => (
+                <Card key={patient.id} onClick={() => openPatientDetails(patient)} className="hover:border-blue-300">
+                  <div className="p-4 sm:p-5">
+                    <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-4 mb-3">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-bold text-lg text-slate-800 hover:text-blue-600 transition-colors">{patient.nome}</h3>
+                          <span className="text-slate-500 text-sm">({patient.idade} anos)</span>
+                        </div>
+                        <p className="text-sm font-medium text-slate-600 mb-1">{patient.hipotese}</p>
+                        <p className="text-xs text-slate-400">
+                          Admitido em: {patient.createdAt ? new Date(patient.createdAt.seconds * 1000).toLocaleString('pt-BR') : 'Agora'}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        <Badge status={patient.status} />
+                        {patient.evolutions && patient.evolutions.length > 0 && (
+                          <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded border border-purple-100 flex items-center gap-1">
+                            <MessageSquare size={10} /> {patient.evolutions.length} evoluções
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-50 rounded-lg p-3 text-sm text-slate-700 border border-slate-100">
+                      <div className="grid sm:grid-cols-2 gap-x-4 gap-y-2">
+                        <div>
+                          <span className="font-semibold text-xs text-slate-500 uppercase block mb-1">Conduta Inicial</span>
+                          <span className="line-clamp-2">{patient.conduta}</span>
+                        </div>
+                        {(patient.pendencias || patient.motivoInternacao) && (
+                          <div className="sm:border-l sm:border-slate-200 sm:pl-4 mt-2 sm:mt-0">
+                            {patient.pendencias && (
+                              <div className="mb-2">
+                                <span className="font-semibold text-xs text-orange-500 uppercase block mb-1">Pendências</span>
+                                <span className="line-clamp-1">{patient.pendencias}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
+                </Card>
+              ))}
+            </div>
           </div>
-        )}
+        ))}
+      </div>
+    )}
+  </div>
+)}
       </main>
     </div>
   );
